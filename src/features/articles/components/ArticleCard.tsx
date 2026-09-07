@@ -1,18 +1,11 @@
-import { useState, useEffect, type JSX } from "react";
+import { useState, type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineHeart, AiFillHeart } from "react-icons/ai";
 import { FiMessageCircle, FiMoreHorizontal } from "react-icons/fi";
 import { LuBookmark, LuBookmarkCheck, LuClock } from "react-icons/lu";
 import { Avatar } from "@/components/common";
-import { toast } from "@/hooks/useToast";
+import { likeArticle } from "@/features/articles/api/articleApi";
 import articlePlaceholder from "@/assets/images/article-placeholder.jpg";
-import {
-  getUserProfileById,
-  formatProfileName,
-  getProfileAvatar,
-  getProfileRole,
-  type UserProfile,
-} from "@/lib/api/user.api";
 
 export interface ArticleCardProps {
   id: string;
@@ -28,6 +21,10 @@ export interface ArticleCardProps {
   isAvatarLink?: boolean;
   /** Optional custom URL for the avatar link (defaults to /profile/:authorId or /profile) */
   authorLink?: string;
+  /** Custom navigation destination URL when card is clicked (defaults to /articles/:id or /articles/:id/edit if isEditable) */
+  targetHref?: string;
+  /** When true, clicking card navigates to edit mode /articles/:id/edit */
+  isEditable?: boolean;
   createdAt: string;
   readTimeMinutes?: number;
   likes?: number;
@@ -91,6 +88,8 @@ export function ArticleCard({
   authorRole,
   isAvatarLink = false,
   authorLink,
+  targetHref,
+  isEditable = false,
   createdAt,
   readTimeMinutes = 4,
   likes = 0,
@@ -102,47 +101,31 @@ export function ArticleCard({
   variant = "horizontal",
 }: ArticleCardProps): JSX.Element {
   const navigate = useNavigate();
-  const [likedOverride, setLikedOverride] = useState<boolean | null>(null);
-  const [likeOffset, setLikeOffset] = useState<number>(0);
   const [isLiking, setIsLiking] = useState<boolean>(false);
-  const [fetchedProfile, setFetchedProfile] = useState<UserProfile | null>(null);
+  const [prevLiked, setPrevLiked] = useState<boolean>(isLiked);
+  const [prevLikes, setPrevLikes] = useState<number>(likes);
+  const [internalLiked, setInternalLiked] = useState<boolean>(isLiked);
+  const [internalLikes, setInternalLikes] = useState<number>(likes);
+
+  if (prevLiked !== isLiked) {
+    setPrevLiked(isLiked);
+    setInternalLiked(isLiked);
+  }
+  if (prevLikes !== likes) {
+    setPrevLikes(likes);
+    setInternalLikes(likes);
+  }
+
+  const hasLiked = onLike ? isLiked : internalLiked;
+  const currentLikes = onLike ? likes : internalLikes;
 
   const isAvatarLinkEnabled = Boolean(isAvatarLink || authorLink);
   const targetAuthorHref = authorLink || (authorId ? `/profile/${authorId}` : "/profile");
+  const destinationHref = targetHref || (isEditable ? `/articles/${id}/edit` : `/articles/${id}`);
 
-  const hasLiked = likedOverride !== null ? likedOverride : isLiked;
-  const localLikes = Math.max(0, likes + likeOffset);
-
-  useEffect(() => {
-    if (!authorId || (authorName && authorName !== "DevSpace Author")) {
-      return;
-    }
-    let cancelled = false;
-
-    async function loadAuthorProfile(): Promise<void> {
-      try {
-        const profile = await getUserProfileById(authorId as string);
-        if (!cancelled) {
-          setFetchedProfile(profile);
-        }
-      } catch {
-        // Keep fallback values gracefully on network failure
-      }
-    }
-
-    void loadAuthorProfile();
-    return () => {
-      cancelled = true;
-    };
-  }, [authorId, authorName]);
-
-  const displayAuthorName =
-    authorName && authorName !== "DevSpace Author"
-      ? authorName
-      : formatProfileName(fetchedProfile, authorName || "DevSpace Author");
-
-  const displayAuthorAvatar = authorAvatar ?? getProfileAvatar(fetchedProfile);
-  const displayAuthorRole = authorRole ?? getProfileRole(fetchedProfile);
+  const displayAuthorName = authorName || "DevSpace Author";
+  const displayAuthorAvatar = authorAvatar;
+  const displayAuthorRole = authorRole;
 
   const formattedDate = new Date(createdAt).toLocaleDateString("en-US", {
     month: "short",
@@ -155,7 +138,7 @@ export function ArticleCard({
     if (target.closest("button, a, input, textarea, select")) {
       return;
     }
-    navigate(`/articles/${id}`);
+    navigate(destinationHref);
   };
 
   const handleCardKeyDown = (e: React.KeyboardEvent<HTMLElement>): void => {
@@ -165,7 +148,7 @@ export function ArticleCard({
         return;
       }
       e.preventDefault();
-      navigate(`/articles/${id}`);
+      navigate(destinationHref);
     }
   };
 
@@ -173,19 +156,21 @@ export function ArticleCard({
     e.preventDefault();
     e.stopPropagation();
     if (isLiking) return;
-    const wasLiked = hasLiked;
-    const offsetDelta = wasLiked ? -1 : 1;
-    // Optimistic toggle
-    setLikedOverride(!wasLiked);
-    setLikeOffset((prev) => prev + offsetDelta);
     setIsLiking(true);
     try {
-      if (onLike) await onLike(id);
+      if (onLike) {
+        await onLike(id);
+      } else {
+        const wasLiked = internalLiked;
+        setInternalLiked(!wasLiked);
+        setInternalLikes((prev) => Math.max(0, prev + (wasLiked ? -1 : 1)));
+        await likeArticle(id);
+      }
     } catch {
-      // Revert on failure
-      setLikedOverride(wasLiked);
-      setLikeOffset((prev) => prev - offsetDelta);
-      toast.error("Failed to update like status");
+      if (!onLike) {
+        setInternalLiked(isLiked);
+        setInternalLikes(likes);
+      }
     } finally {
       setIsLiking(false);
     }
@@ -270,7 +255,7 @@ export function ArticleCard({
                 ) : (
                   <AiOutlineHeart className="w-3.5 h-3.5" />
                 )}
-                <span>{localLikes}</span>
+                <span>{currentLikes}</span>
               </button>
 
               {/* Comments */}
@@ -404,7 +389,7 @@ export function ArticleCard({
             ) : (
               <AiOutlineHeart className="w-4 h-4" />
             )}
-            <span className="text-xs font-medium">{localLikes}</span>
+            <span className="text-xs font-medium">{currentLikes}</span>
           </button>
 
           {/* Comments */}

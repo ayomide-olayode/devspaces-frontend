@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import { ENDPOINTS } from "./endpoints";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 export interface UserProfile {
   id?: string;
@@ -18,15 +19,26 @@ export interface UserProfile {
   [key: string]: unknown;
 }
 
-/**
- * Fetches the user profile from /api/User/profile.
- * When `id` is passed, it requests the profile for that specific author/user ID via ?id={id}.
- */
 export async function getUserProfile(id?: string): Promise<UserProfile> {
-  const response = await apiClient.get<UserProfile>(ENDPOINTS.USER.PROFILE, {
-    params: id ? { id } : undefined,
-  });
-  return response.data;
+  const currentAuthUser = useAuthStore.getState().user;
+
+  // If requesting the logged-in user's own profile
+  if (!id || (currentAuthUser?.id && id === currentAuthUser.id)) {
+    const response = await apiClient.get<UserProfile>(ENDPOINTS.USER.PROFILE);
+    return response.data;
+  }
+
+  // If requesting another author's profile, query by specific ID route
+  try {
+    const response = await apiClient.get<UserProfile>(`/api/User/${id}`);
+    if (response.data) {
+      return response.data;
+    }
+  } catch {
+    // Endpoint may not be available for other users
+  }
+
+  return { id };
 }
 
 const profileCache = new Map<string, Promise<UserProfile>>();
@@ -62,12 +74,23 @@ export function formatProfileName(
   fallback = "DevSpace Author",
 ): string {
   if (!profile) return fallback;
-  const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim();
+  const p = profile as Record<string, unknown>;
+  const fullName = [
+    profile.firstName || (p.FirstName as string | undefined),
+    profile.lastName || (p.LastName as string | undefined),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   if (fullName) return fullName;
-  if (profile.name && typeof profile.name === "string") return profile.name;
-  if (profile.fullName && typeof profile.fullName === "string") return profile.fullName;
-  if (profile.userName && typeof profile.userName === "string") return profile.userName;
-  if (profile.username && typeof profile.username === "string") return profile.username;
+  if (typeof profile.fullName === "string" && profile.fullName.trim()) return profile.fullName.trim();
+  if (typeof p.FullName === "string" && p.FullName.trim()) return p.FullName.trim();
+  if (typeof profile.name === "string" && profile.name.trim()) return profile.name.trim();
+  if (typeof p.Name === "string" && p.Name.trim()) return p.Name.trim();
+  if (typeof profile.userName === "string" && profile.userName.trim()) return profile.userName.trim();
+  if (typeof p.UserName === "string" && p.UserName.trim()) return p.UserName.trim();
+  if (typeof profile.username === "string" && profile.username.trim()) return profile.username.trim();
+  if (typeof p.Username === "string" && p.Username.trim()) return p.Username.trim();
   return fallback;
 }
 

@@ -66,12 +66,12 @@ export function AuthorCard({
 
   const displayName = formatProfileName(
     profile,
-    authorName && authorName !== "DevSpace Author" ? authorName : "Ada Okafor",
+    authorName && authorName !== "DevSpace Author" ? authorName : (authorName || "Author"),
   );
   const displayAvatar = authorAvatar || getProfileAvatar(profile);
-  const displayRole = authorRole || getProfileRole(profile) || "Senior Frontend Engineer";
-  const rawCompany = company || (profile?.company as string | undefined) || "Terminal Systems";
-  const displayCompany = rawCompany.startsWith("@") ? rawCompany : `@ ${rawCompany}`;
+  const displayRole = authorRole || getProfileRole(profile) || "Community Author";
+  const rawCompany = company || (profile?.company as string | undefined) || "";
+  const displayCompany = rawCompany ? (rawCompany.startsWith("@") ? rawCompany : `@ ${rawCompany}`) : "";
 
   const displayBio =
     authorBio ||

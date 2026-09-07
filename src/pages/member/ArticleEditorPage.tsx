@@ -20,7 +20,16 @@ export function ArticleEditorPage(): JSX.Element {
       try {
         setIsLoading(true);
         const article = await getArticleById(id as string);
-        setInitialData(article);
+        setInitialData({
+          title: article.title,
+          slug: article.slug || "",
+          excerpt: article.excerpt || "",
+          content: article.content,
+          coverImage: article.coverImageUrl || article.coverImage || "",
+          tagNames: article.tags || article.tagNames || [],
+          status: article.status || "draft",
+          readingTime: article.readingTimeMinutes ?? article.readingTime ?? 0,
+        });
       } catch (err: unknown) {
         toast.error(getApiErrorMessage(err) || "Failed to load article");
         navigate("/playground");
@@ -53,22 +62,12 @@ export function ArticleEditorPage(): JSX.Element {
     try {
       if (isEditing && id) {
         await updateArticle(id, data);
-        toast.success(
-          data.status === "scheduled"
-            ? "Article scheduled successfully!"
-            : "Article updated and published!",
-        );
+        toast.success("Article updated and published!");
       } else {
-        const created = await createArticle(data);
-        toast.success(
-          data.status === "scheduled"
-            ? "Article scheduled successfully!"
-            : "Article published successfully!",
-        );
-        if (created.id) {
-          navigate(`/articles/${created.id}/edit`, { replace: true });
-        }
+        await createArticle(data);
+        toast.success("Article published successfully!");
       }
+      navigate("/articles");
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err) || "Failed to publish article");
       throw err;

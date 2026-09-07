@@ -10,30 +10,37 @@ export const articleSchema = z
     excerpt: z
       .string()
       .max(160, "Excerpt must not exceed 160 characters")
+      .nullable()
       .optional()
       .or(z.literal("")),
     content: z.string().min(1, "Content cannot be empty"),
-    coverImage: z.string().optional().or(z.literal("")),
+    coverImage: z.string().nullable().optional().or(z.literal("")),
     coverImageAlt: z
       .string()
       .max(160, "Alt text must not exceed 160 characters")
+      .nullable()
       .optional()
       .or(z.literal("")),
     tagNames: z.array(z.string()).max(4, "Maximum 4 tags allowed"),
-    status: z.enum(["draft", "published", "scheduled", "archived"]),
-    scheduledFor: z.string().optional().or(z.literal("")),
+    status: z.enum([
+      "draft",
+      "published",
+      // "scheduled",
+      // "archived",
+    ]),
+    // scheduledFor: z.string().optional().or(z.literal("")),
     visibility: z.enum(["public", "unlisted"]),
     series: z.string().optional().or(z.literal("")),
     readingTime: z.number().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.status === "scheduled" && !data.scheduledFor) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please select a date and time to schedule this article",
-        path: ["scheduledFor"],
-      });
-    }
   });
+  // .superRefine((data, ctx) => {
+  //   if (data.status === "scheduled" && !data.scheduledFor) {
+  //     ctx.addIssue({
+  //       code: z.ZodIssueCode.custom,
+  //       message: "Please select a date and time to schedule this article",
+  //       path: ["scheduledFor"],
+  //     });
+  //   }
+  // });
 
 export type ArticleFormData = z.infer<typeof articleSchema>;

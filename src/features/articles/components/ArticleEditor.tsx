@@ -74,7 +74,7 @@ export function ArticleEditor({
       coverImageAlt: initialData?.coverImageAlt ?? "",
       tagNames: initialData?.tagNames ?? [],
       status: initialData?.status ?? "draft",
-      scheduledFor: initialData?.scheduledFor ?? "",
+      // scheduledFor: initialData?.scheduledFor ?? "",
       visibility: initialData?.visibility ?? "public",
       series: initialData?.series ?? "",
       readingTime: initialData?.readingTime ?? 0,
@@ -186,16 +186,16 @@ export function ArticleEditor({
   };
 
   const handlePublishHandler = async (data: ArticleFormData) => {
+    if (data.status === "draft") {
+      await handleSaveDraftHandler(data);
+      return;
+    }
     setIsPublishing(true);
     try {
       if (onPublish) {
         await onPublish(data);
       }
-      toast.success(
-        data.status === "scheduled"
-          ? "Article scheduled successfully!"
-          : "Article published successfully!",
-      );
+      toast.success("Article published successfully!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to publish article");
     } finally {
@@ -227,11 +227,21 @@ export function ArticleEditor({
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-emerald-600 font-medium mr-2 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-              <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px]">
+            <div
+              className={`hidden md:flex items-center gap-1.5 text-xs font-medium mr-2 px-2.5 py-1 rounded-full border ${
+                statusValue === "published"
+                  ? "text-blue-600 bg-blue-50 border-blue-100"
+                  : "text-emerald-600 bg-emerald-50 border-emerald-100"
+              }`}
+            >
+              <span
+                className={`w-4 h-4 rounded-full text-white flex items-center justify-center text-[10px] ${
+                  statusValue === "published" ? "bg-blue-500" : "bg-emerald-500"
+                }`}
+              >
                 <HiOutlineCheck className="w-3 h-3 stroke-3" />
               </span>
-              <span>Draft saved just now</span>
+              <span>{statusValue === "published" ? "Published" : "Draft saved just now"}</span>
             </div>
 
             <Button
@@ -243,28 +253,34 @@ export function ArticleEditor({
               Preview
             </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              isLoading={isSaving}
-              onClick={handleSubmit(handleSaveDraftHandler)}
-              className="border-primary/40 text-primary hover:bg-primary/5 font-medium"
-            >
-              Save Draft
-            </Button>
+            {statusValue !== "draft" && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                isLoading={isSaving}
+                onClick={handleSubmit(handleSaveDraftHandler)}
+                className="border-primary/40 text-primary hover:bg-primary/5 font-medium"
+              >
+                Save Draft
+              </Button>
+            )}
 
             <div className="relative inline-flex">
               <Button
                 type="button"
                 variant="primary"
                 size="sm"
-                isLoading={isPublishing}
-                onClick={handleSubmit(handlePublishHandler)}
+                isLoading={statusValue === "draft" ? isSaving : isPublishing}
+                onClick={
+                  statusValue === "draft"
+                    ? handleSubmit(handleSaveDraftHandler)
+                    : handleSubmit(handlePublishHandler)
+                }
                 rightIcon={<HiOutlineChevronDown className="w-3.5 h-3.5 ml-0.5" />}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
               >
-                {statusValue === "scheduled" ? "Schedule" : "Publish"}
+                {statusValue === "draft" ? "Save Draft" : "Publish"}
               </Button>
             </div>
           </div>
@@ -862,15 +878,15 @@ export function ArticleEditor({
                   >
                     <option value="draft">• Draft</option>
                     <option value="published">• Published</option>
-                    <option value="scheduled">• Scheduled</option>
-                    <option value="archived">• Archived</option>
+                    {/* <option value="scheduled">• Scheduled</option> */}
+                    {/* <option value="archived">• Archived</option> */}
                   </select>
                   <HiOutlineChevronDown className="w-3.5 h-3.5 text-text/50 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
 
               {/* Scheduled For — shown only when status is "scheduled" */}
-              {statusValue === "scheduled" && (
+              {/* {statusValue === "scheduled" && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-text">Scheduled for</label>
                   <input
@@ -882,7 +898,7 @@ export function ArticleEditor({
                     <p className="text-xs text-red-500 font-medium">{errors.scheduledFor.message}</p>
                   )}
                 </div>
-              )}
+              )} */}
 
               {/* Publish To Radio Options */}
               <div className="space-y-2 pt-1">

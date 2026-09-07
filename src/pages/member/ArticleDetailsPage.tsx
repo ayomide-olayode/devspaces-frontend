@@ -13,7 +13,7 @@ import remarkGfm from "remark-gfm";
 import { Button, Avatar, Skeleton, Tag } from "@/components/common";
 import { toast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils/cn";
-import { getArticleById, likeArticle, deleteArticle, saveArticle, type Article } from "@/features/articles/api/articleApi";
+import { getArticleById, likeArticle, deleteArticle, saveArticle, getPostInteraction, type Article } from "@/features/articles/api/articleApi";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { useAuthStore } from "@/stores/useAuthStore";
 import ArticleComments from "@/features/articles/components/ArticleComments";
@@ -55,8 +55,13 @@ export function ArticleDetailsPage(): JSX.Element {
     async function loadArticle() {
       try {
         setIsLoading(true);
-        const data = await getArticleById(id as string);
-        if (isSubscribed) {
+        const [articleRes, interactionRes] = await Promise.allSettled([
+          getArticleById(id as string),
+          getPostInteraction(id as string),
+        ]);
+
+        if (isSubscribed && articleRes.status === "fulfilled" && articleRes.value) {
+          const data = articleRes.value;
           // Add display properties to article
           const dataRecord = data as unknown as Record<string, unknown>;
           const initialLikes =
@@ -66,25 +71,40 @@ export function ArticleDetailsPage(): JSX.Element {
             (dataRecord.likeCount as number | undefined) ??
             0;
 
-          const initialLiked = Boolean(
-            data.liked ??
-            data.isLiked ??
-            (dataRecord.liked as boolean | undefined) ??
-            (dataRecord.isLiked as boolean | undefined) ??
-            false,
-          );
+          const interaction = interactionRes.status === "fulfilled" ? interactionRes.value : null;
 
-          const initialSaved = Boolean(
-            (dataRecord.isBookmarked as boolean | undefined) ??
-            (dataRecord.isSaved as boolean | undefined) ??
-            (dataRecord.saved as boolean | undefined) ??
-            false,
-          );
+          const initialLiked = interaction && typeof interaction.liked === "boolean"
+            ? interaction.liked
+            : Boolean(
+                data.liked ??
+                data.isLiked ??
+                (dataRecord.liked as boolean | undefined) ??
+                (dataRecord.isLiked as boolean | undefined) ??
+                false,
+              );
+
+          const initialSaved = interaction && typeof interaction.saved === "boolean"
+            ? interaction.saved
+            : Boolean(
+                (dataRecord.isBookmarked as boolean | undefined) ??
+                (dataRecord.isSaved as boolean | undefined) ??
+                (dataRecord.saved as boolean | undefined) ??
+                false,
+              );
+
+          const authorObj = data.author;
+          const resolvedAuthorName =
+            (authorObj && (authorObj.name?.trim() || authorObj.userName?.trim())) ||
+            (dataRecord.authorName as string | undefined)?.trim() ||
+            "DevSpace Author";
+          const resolvedAuthorAvatar =
+            (authorObj && authorObj.avatarUrl) ||
+            (dataRecord.authorAvatar as string | undefined);
 
           const displayArticle: DisplayArticle = {
             ...data,
-            authorName: (dataRecord.authorName as string | undefined) || "DevSpace Author",
-            authorAvatar: dataRecord.authorAvatar as string | undefined,
+            authorName: resolvedAuthorName,
+            authorAvatar: resolvedAuthorAvatar || undefined,
             likes: initialLikes,
             comments: (dataRecord.comments as number | undefined) || (data.commentCount as number | undefined) || 0,
           };
@@ -172,7 +192,7 @@ export function ArticleDetailsPage(): JSX.Element {
     if (navigator.share && article) {
       navigator.share({
         title: article.title,
-        text: article.excerpt,
+        text: article.excerpt || "",
         url: window.location.href,
       });
     } else {
