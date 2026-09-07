@@ -27,6 +27,7 @@ export interface Article extends Partial<ArticleFormData> {
   authorName?: string;
   title: string;
   content: string;
+
   slug?: string;
   excerpt?: string | null;
   tags?: string[];
@@ -34,13 +35,17 @@ export interface Article extends Partial<ArticleFormData> {
   attachments?: Attachment[];
   coverImageUrl?: string | null;
   coverImage?: string;
+
   readingTimeMinutes?: number;
   readingTime?: number;
+
   likeCount?: number;
   likes?: number;
   liked?: boolean;
   isLiked?: boolean;
+
   viewCount?: number;
+
   commentCount?: number;
   comments?: number;
   status?: "draft" | "published"; // | "scheduled" | "archived"
@@ -145,12 +150,18 @@ export async function getMyPosts(): Promise<Article[]> {
   if (response.data && Array.isArray((response.data as MyPostsResponse).data)) {
     return (response.data as MyPostsResponse).data;
   }
+
   return [];
 }
 
-/** GET /api/posts/{id} — fetch a single post */
-export async function getArticleById(id: string): Promise<Article> {
-  const response = await apiClient.get<Article>(ENDPOINTS.POSTS.DETAIL(id));
+export async function getArticleById(
+  id: string,
+): Promise<Article> {
+  const response =
+    await apiClient.get<Article>(
+      ENDPOINTS.POSTS.DETAIL(id),
+    );
+
   return response.data;
 }
 
@@ -180,9 +191,12 @@ export async function updateArticle(id: string, data: Partial<ArticleFormData>):
   return response.data;
 }
 
-/** DELETE /api/posts/{id} — delete a post */
-export async function deleteArticle(id: string): Promise<void> {
-  await apiClient.delete(ENDPOINTS.POSTS.DETAIL(id));
+export async function deleteArticle(
+  id: string,
+): Promise<void> {
+  await apiClient.delete(
+    ENDPOINTS.POSTS.DETAIL(id),
+  );
 }
 
 /** POST /api/posts/{id}/like — like or unlike a post */
@@ -201,11 +215,20 @@ export async function getArticleComments(id: string): Promise<Comment[]> {
   return response.data;
 }
 
-/** POST /api/posts/{id}/comment — create a comment on a post */
-export async function createComment(id: string, message: string, parentId?: string): Promise<Comment> {
-  const response = await apiClient.post<Comment>(`/api/posts/${id}/comment`, {
-    message,
-    parentId: parentId || null,
-  });
+
+export async function createComment(
+  id: string,
+  message: string,
+  parentId?: string,
+): Promise<Comment> {
+  const response =
+    await apiClient.post<Comment>(
+      ENDPOINTS.POSTS.CREATE_COMMENT(id),
+      {
+        message,
+        parentId: parentId ?? null,
+      },
+    );
+
   return response.data;
 }
