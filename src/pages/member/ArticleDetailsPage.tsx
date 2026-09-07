@@ -75,7 +75,7 @@ export function ArticleDetailsPage(): JSX.Element {
       try {
         setIsLoading(true);
 
-        const data = await getArticleById(id);
+        const data = await getArticleById("id");
 
         if (!isSubscribed) {
           return;
