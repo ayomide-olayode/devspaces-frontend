@@ -1,49 +1,68 @@
-import { useState, useEffect, type JSX } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import {
-  AiOutlineHeart,
-  AiFillHeart,
-  AiOutlineComment,
-  AiOutlineShareAlt,
-} from "react-icons/ai";
-import { LuBookmark, LuBookmarkCheck, LuClock } from "react-icons/lu";
+import { useEffect,useState,type JSX} from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { AiFillHeart, AiOutlineComment, AiOutlineHeart, AiOutlineShareAlt } from "react-icons/ai";
 import { HiOutlineEllipsisHorizontal } from "react-icons/hi2";
+import { LuBookmark, LuBookmarkCheck, LuClock } from "react-icons/lu";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Button, Avatar, Skeleton, Tag } from "@/components/common";
+
+import {
+  Avatar,
+  Button,
+  Skeleton,
+  Tag,
+} from "@/components/common";
+
 import { toast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils/cn";
-import { getArticleById, likeArticle, deleteArticle, saveArticle, type Article } from "@/features/articles/api/articleApi";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { deleteArticle, getArticleById, likeArticle, saveArticle, type Article } from "@/features/articles/api/articleApi";
 import { useAuthStore } from "@/stores/useAuthStore";
 import ArticleComments from "@/features/articles/components/ArticleComments";
 import RelatedArticles from "@/features/articles/components/RelatedArticles";
 import AuthorCard from "@/features/articles/components/AuthorCard";
 
-// Extended Article type with optional display properties
 interface DisplayArticle extends Article {
   authorName?: string;
   authorAvatar?: string;
-  likes?: number;
-  comments?: number;
 }
 
 export function ArticleDetailsPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const currentUser = useAuthStore((state) => state.user);
 
-  const [article, setArticle] = useState<DisplayArticle | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [isLiking, setIsLiking] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [commentCount, setCommentCount] = useState(0);
+  const currentUser = useAuthStore(
+    (state) => state.user,
+  );
 
-  // Fetch article
+  const [article, setArticle] =
+    useState<DisplayArticle | null>(null);
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [isLiked, setIsLiked] =
+    useState(false);
+
+  const [isBookmarked, setIsBookmarked] =
+    useState(false);
+
+  const [likeCount, setLikeCount] =
+    useState(0);
+
+  const [commentCount, setCommentCount] =
+    useState(0);
+
+  const [isLiking, setIsLiking] =
+    useState(false);
+
+  const [isSaving, setIsSaving] =
+    useState(false);
+
+  const [showMoreMenu, setShowMoreMenu] =
+    useState(false);
+
   useEffect(() => {
     if (!id) {
       navigate("/articles");
@@ -55,48 +74,67 @@ export function ArticleDetailsPage(): JSX.Element {
     async function loadArticle() {
       try {
         setIsLoading(true);
-        const data = await getArticleById(id as string);
-        if (isSubscribed) {
-          // Add display properties to article
-          const dataRecord = data as unknown as Record<string, unknown>;
-          const initialLikes =
-            (data.likeCount as number | undefined) ??
-            (data.likes as number | undefined) ??
-            (dataRecord.likes as number | undefined) ??
-            (dataRecord.likeCount as number | undefined) ??
-            0;
 
-          const initialLiked = Boolean(
-            data.liked ??
-            data.isLiked ??
-            (dataRecord.liked as boolean | undefined) ??
-            (dataRecord.isLiked as boolean | undefined) ??
-            false,
-          );
+        const data = await getArticleById(id);
 
-          const initialSaved = Boolean(
-            (dataRecord.isBookmarked as boolean | undefined) ??
-            (dataRecord.isSaved as boolean | undefined) ??
-            (dataRecord.saved as boolean | undefined) ??
-            false,
-          );
-
-          const displayArticle: DisplayArticle = {
-            ...data,
-            authorName: (dataRecord.authorName as string | undefined) || "DevSpace Author",
-            authorAvatar: dataRecord.authorAvatar as string | undefined,
-            likes: initialLikes,
-            comments: (dataRecord.comments as number | undefined) || (data.commentCount as number | undefined) || 0,
-          };
-
-          setArticle(displayArticle);
-          setIsLiked(initialLiked);
-          setIsBookmarked(initialSaved);
-          setLikeCount(initialLikes);
-          setCommentCount(displayArticle.comments || 0);
+        if (!isSubscribed) {
+          return;
         }
-      } catch (err: unknown) {
-        toast.error(getApiErrorMessage(err) || "Failed to load article");
+
+        const articleData =
+          data as Article &
+            Record<string, unknown>;
+
+        const initialLikes =
+          data.likeCount ??
+          data.likes ??
+          0;
+
+        const initialLiked = Boolean(
+          data.liked ??
+            data.isLiked ??
+            false,
+        );
+        const initialSaved = Boolean(
+          articleData.isBookmarked ??
+            articleData.isSaved ??
+            articleData.saved ??
+            false,
+        );
+
+        const authorName =
+          (articleData.authorName as
+            | string
+            | undefined) ??
+          "DevSpace Author";
+
+        const authorAvatar =
+          (articleData.authorAvatar as
+            | string
+            | undefined) ??
+          undefined;
+
+        const displayArticle: DisplayArticle = {
+          ...data,
+          authorName,
+          authorAvatar,
+        };
+
+        setArticle(displayArticle);
+        setIsLiked(initialLiked);
+        setIsBookmarked(initialSaved);
+        setLikeCount(initialLikes);
+        setCommentCount(
+          data.commentCount ??
+            data.comments ??
+            0,
+        );
+      } catch (error: unknown) {
+        toast.error(
+          getApiErrorMessage(error) ||
+            "Failed to load article",
+        );
+
         if (isSubscribed) {
           navigate("/articles");
         }
@@ -108,121 +146,300 @@ export function ArticleDetailsPage(): JSX.Element {
     }
 
     loadArticle();
+
     return () => {
       isSubscribed = false;
     };
   }, [id, navigate]);
 
-  const handleLike = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
+  const handleLike = async (
+    event?: React.MouseEvent,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (
+      isLiking ||
+      !article
+    ) {
+      return;
     }
-    if (isLiking || !article) return;
+    if (!currentUser) {
+      navigate("/auth/sign-in");
+      return;
+    }
 
-    const wasLiked = isLiked;
-    const offsetDelta = wasLiked ? -1 : 1;
+    const previousLiked = isLiked;
 
-    // Optimistic toggle
-    setIsLiked(!wasLiked);
-    setLikeCount((prev) => Math.max(0, prev + offsetDelta));
+    setIsLiked(!previousLiked);
+
+    setLikeCount((previous) =>
+      Math.max(
+        0,
+        previous + (previousLiked ? -1 : 1),
+      ),
+    );
+
     setIsLiking(true);
 
     try {
       await likeArticle(article.id);
-      if (!wasLiked) {
-        toast.success("Liked article");
-      } else {
-        toast.info("Removed like");
-      }
+
+      toast.success(
+        previousLiked
+          ? "Removed like"
+          : "Liked article",
+      );
     } catch (error: unknown) {
-      // Revert optimistic update
-      setIsLiked(wasLiked);
-      setLikeCount((prev) => Math.max(0, prev - offsetDelta));
-      toast.error(getApiErrorMessage(error) || "Failed to update like status");
+      setIsLiked(previousLiked);
+
+      setLikeCount((previous) =>
+        Math.max(
+          0,
+          previous +
+            (previousLiked ? 1 : -1),
+        ),
+      );
+
+      toast.error(
+        getApiErrorMessage(error) ||
+          "Failed to update like",
+      );
     } finally {
       setIsLiking(false);
     }
   };
 
-  const handleBookmark = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (isSaving || !article) return;
+  const handleBookmark = async (
+    event?: React.MouseEvent,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
 
-    const wasBookmarked = isBookmarked;
+    if (
+      isSaving ||
+      !article
+    ) {
+      return;
+    }
+
+    if (!currentUser) {
+      navigate("/login");
+      return;
+    }
+
+    const previousBookmarked =
+      isBookmarked;
+    setIsBookmarked(
+      !previousBookmarked,
+    );
+
     setIsSaving(true);
-    setIsBookmarked(!wasBookmarked);
 
     try {
       await saveArticle(article.id);
-      toast.success(!wasBookmarked ? "Saved to bookmarks" : "Removed from bookmarks");
+
+      toast.success(
+        previousBookmarked
+          ? "Removed from bookmarks"
+          : "Saved to bookmarks",
+      );
     } catch (error: unknown) {
-      // Revert optimistic update
-      setIsBookmarked(wasBookmarked);
-      toast.error(getApiErrorMessage(error) || "Failed to save article");
+      setIsBookmarked(
+        previousBookmarked,
+      );
+
+      toast.error(
+        getApiErrorMessage(error) ||
+          "Failed to update bookmark",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleShare = () => {
-    if (navigator.share && article) {
-      navigator.share({
-        title: article.title,
-        text: article.excerpt,
-        url: window.location.href,
-      });
-    } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      toast.success("Link copied to clipboard");
+
+
+  const handleShare = async () => {
+    if (!article) {
+      return;
+    }
+
+    try {
+      if (
+        navigator.share
+      ) {
+        await navigator.share({
+          title: article.title,
+          text:
+            article.excerpt ??
+            article.title,
+          url: window.location.href,
+        });
+
+        return;
+      }
+
+      await navigator.clipboard.writeText(
+        window.location.href,
+      );
+
+      toast.success(
+        "Link copied to clipboard",
+      );
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          window.location.href,
+        );
+
+        toast.success(
+          "Link copied to clipboard",
+        );
+      } catch {
+        toast.error(
+          "Unable to share article",
+        );
+      }
     }
   };
 
+
   const handleEdit = () => {
-    navigate(`/articles/${article?.id}/edit`);
-  };
+    if (!article) {
+      return;
+    }
 
-  const handleDelete = async () => {
-    if (!article) return;
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this article? This action cannot be undone."
+    navigate(
+      `/articles/${article.id}/edit`,
     );
 
-    if (!confirmed) return;
+    setShowMoreMenu(false);
+  };
+
+
+
+  const handleDelete = async () => {
+    if (!article) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this article? This action cannot be undone.",
+      );
+
+    if (!confirmed) {
+      return;
+    }
 
     try {
       await deleteArticle(article.id);
-      toast.success("Article deleted successfully");
+
+      toast.success(
+        "Article deleted successfully",
+      );
+
       navigate("/articles");
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error) || "Failed to delete article");
+      toast.error(
+        getApiErrorMessage(error) ||
+          "Failed to delete article",
+      );
     }
   };
 
+  
+
+
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-12">
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-7xl px-4 py-8">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-            <div className="hidden lg:flex flex-col items-center gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} variant="circular" width={40} height={40} />
+            {/* Left skeleton */}
+            <div className="hidden lg:flex lg:col-span-1 flex-col items-center gap-4">
+              {Array.from({
+                length: 5,
+              }).map((_, index) => (
+                <Skeleton
+                  key={index}
+                  variant="circular"
+                  width={40}
+                  height={40}
+                />
               ))}
             </div>
+
+            {/* Main skeleton */}
             <div className="lg:col-span-6">
-              <Skeleton variant="text" width={200} height={12} className="mb-4" />
-              <Skeleton variant="text" width="100%" height={32} className="mb-4" count={2} />
-              <Skeleton variant="rounded" width="100%" height={300} className="mb-4" />
-              <Skeleton variant="text" width="100%" height={16} className="mb-2" count={5} />
+              <Skeleton
+                variant="text"
+                width={180}
+                height={14}
+                className="mb-5"
+              />
+
+              <Skeleton
+                variant="text"
+                width="100%"
+                height={38}
+                count={2}
+                className="mb-5"
+              />
+
+              <Skeleton
+                variant="text"
+                width="90%"
+                height={16}
+                count={2}
+                className="mb-6"
+              />
+
+              <Skeleton
+                variant="rounded"
+                width="100%"
+                height={96}
+                className="mb-6"
+              />
+
+              <Skeleton
+                variant="rounded"
+                width="100%"
+                height={360}
+                className="mb-8"
+              />
+
+              <Skeleton
+                variant="text"
+                width="100%"
+                height={16}
+                count={8}
+              />
             </div>
-            <div className="hidden lg:block lg:col-span-4">
-              <Skeleton variant="rounded" width="100%" height={200} className="mb-4" />
-              <Skeleton variant="rounded" width="100%" height={200} />
+
+            {/* Right skeleton */}
+            <div className="hidden lg:block lg:col-span-5">
+              <Skeleton
+                variant="rounded"
+                width="100%"
+                height={220}
+                className="mb-6"
+              />
+
+              <Skeleton
+                variant="rounded"
+                width="100%"
+                height={300}
+              />
             </div>
           </div>
         </div>
@@ -230,13 +447,29 @@ export function ArticleDetailsPage(): JSX.Element {
     );
   }
 
+ 
+
+
+
   if (!article) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-text mb-2">Article not found</h1>
-          <p className="text-text/60 mb-4">The article you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate("/articles")} variant="primary">
+          <h1 className="mb-2 text-2xl font-bold text-gray-900">
+            Article not found
+          </h1>
+
+          <p className="mb-5 text-sm text-gray-500">
+            The article you're looking for
+            doesn't exist.
+          </p>
+
+          <Button
+            onClick={() =>
+              navigate("/articles")
+            }
+            variant="primary"
+          >
             Back to Articles
           </Button>
         </div>
@@ -244,286 +477,534 @@ export function ArticleDetailsPage(): JSX.Element {
     );
   }
 
-  const isAuthor = currentUser?.id === article.authorId;
-  const formattedDate = new Date(article.createdAt).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  
 
-  const readingTime = Math.max(1, Math.ceil((article.content?.length || 0) / 200));
+
+
+  const isAuthor =
+    currentUser?.id ===
+    article.authorId;
+
+  const formattedDate =
+    new Date(
+      article.createdAt,
+    ).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      },
+    );
+
+  const readingTime =
+    article.readingTimeMinutes ??
+    article.readingTime ??
+    Math.max(
+      1,
+      Math.ceil(
+        (article.content?.length ?? 0) /
+          200,
+      ),
+    );
+
+  const coverImage =
+    article.coverImage ??
+    article.coverImageUrl ??
+    undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-7xl px-4 py-2">
-        {/* Header bar */}
-        <div className="mb-8 h-1 bg-linear-to-r from-primary to-blue-500 rounded-full" />
+    <div className="min-h-screen w-full bg-gray-50">
+      <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
 
-        <div className="grid grid-cols-12 gap-8">
-          {/* Left Sidebar - Actions */}
-          <div className="hidden lg:flex lg:col-span-1 bg-white flex-col items-center gap-2 sticky top-8 h-fit rounded-lg shadow-sm">
-            {/* Like button */}
-            <button
-              type="button"
-              onClick={handleLike}
-              disabled={isLiking}
-              className={cn(
-                "flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200 disabled:opacity-50 group cursor-pointer",
-                isLiked
-                  ? "text-red-500 bg-red-50 hover:bg-red-100"
-                  : "text-gray-400 hover:text-red-500 hover:bg-gray-100",
-              )}
-              title={isLiked ? "Unlike" : "Like"}
-              aria-label={isLiked ? "Unlike article" : "Like article"}
-            >
-              {isLiked ? (
-                <AiFillHeart className="w-6 h-6 text-red-500 transition-transform active:scale-125" />
-              ) : (
-                <AiOutlineHeart className="w-6 h-6 transition-colors group-hover:text-red-500" />
-              )}
-              <span className={cn("text-xs font-bold", isLiked ? "text-red-600" : "text-gray-600")}>
-                {likeCount}
-              </span>
-            </button>
+        <div className="mb-8 h-1 rounded-full bg-linear-to-r from-primary to-blue-500" />
 
-            {/* Comment button */}
-            <button
-              type="button"
-              onClick={() => document.getElementById("comments-section")?.scrollIntoView({ behavior: "smooth" })}
-              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-100 transition-all duration-200 group cursor-pointer"
-              title="Comments"
-              aria-label="Jump to comments"
-            >
-              <AiOutlineComment className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors" />
-              <span className="text-xs font-bold text-gray-600">{commentCount}</span>
-            </button>
+        <div className="flex justify-between gap-8 lg:gap-12 w-full">
 
-            {/* Bookmark button */}
-            <button
-              type="button"
-              onClick={handleBookmark}
-              disabled={isSaving}
-              className={cn(
-                "flex flex-col items-center gap-2 p-3 rounded-lg transition-all duration-200 group disabled:opacity-50 cursor-pointer",
-                isBookmarked
-                  ? "text-primary bg-primary/10 hover:bg-primary/15"
-                  : "text-gray-400 hover:text-primary hover:bg-gray-100",
-              )}
-              title={isBookmarked ? "Remove bookmark" : "Bookmark"}
-              aria-label={isBookmarked ? "Remove bookmark" : "Bookmark"}
-            >
-              {isBookmarked ? (
-                <LuBookmarkCheck className="w-6 h-6 text-primary" />
-              ) : (
-                <LuBookmark className="w-6 h-6 group-hover:text-primary transition-colors" />
-              )}
-            </button>
-
-            {/* Share button */}
-            <button
-              onClick={handleShare}
-              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-100 transition-all duration-200 group"
-              title="Share"
-            >
-              <AiOutlineShareAlt className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors" />
-            </button>
-
-            {/* More options */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreMenu(!showMoreMenu)}
-                className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-100 transition-all duration-200 group"
-                title="More options"
-              >
-                <HiOutlineEllipsisHorizontal className="w-6 h-6 text-gray-400 group-hover:text-primary transition-colors" />
-              </button>
-
-              {showMoreMenu && (
-                <div className="absolute left-14 top-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-44 py-1">
-                  {isAuthor ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleEdit();
-                          setShowMoreMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Edit Article
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleDelete();
-                          setShowMoreMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        Delete Article
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                        Report Article
-                      </button>
-                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                        Block Author
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-6 space-y-6">
-            {/* Article header */}
-            <div className="space-y-4">
-              <h1 className="text-4xl lg:text-5xl font-black text-gray-900 leading-tight">
-                {article.title}
-              </h1>
-
-              <p className="text-base text-gray-600 leading-relaxed max-w-2xl">
-                {article.excerpt}
-              </p>
-
-              {/* Tags */}
-              {article.tagNames && article.tagNames.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {article.tagNames.map((tag) => (
-                    <Tag key={tag} variant="outline" size="sm">
-                      {tag}
-                    </Tag>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Author info bar */}
-            <div className="flex items-center justify-between py-4 border-t border-b border-gray-200">
-              <div className="flex items-center gap-4">
-                <Avatar
-                src={article.authorAvatar ?? undefined}
-                alt={article.authorName ?? "Author profile"}
-                name={article.authorName ?? "Author"}
-                size="md"
-                className="w-12 h-12"
-                />
-                <div>
-                  <p className="font-semibold text-gray-900">{article.authorName}</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{formattedDate}</span>
-                    <span>·</span>
-                    <span className="flex items-center gap-1">
-                      <LuClock className="w-3 h-3" />
-                      {readingTime} min read
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <Button variant="primary" size="md" className="whitespace-nowrap">
-                Follow
-              </Button>
-            </div>
-
-            {/* Cover image */}
-            {article.coverImage && (
-              <div className="rounded-lg overflow-hidden shadow-md">
-                <img
-                  src={article.coverImage}
-                  alt={article.title}
-                  className="w-full h-96 object-cover"
-                />
-              </div>
-            )}
-
-            {/* Article content */}
-            <article className="prose prose-sm max-w-none 
-              prose-headings:font-bold prose-headings:text-gray-900 prose-headings:mt-6 prose-headings:mb-3
-              prose-p:text-gray-700 prose-p:leading-relaxed
-              prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-              prose-strong:text-gray-900
-              prose-code:bg-gray-100 prose-code:rounded prose-code:px-2 prose-code:py-1 prose-code:text-sm prose-code:text-gray-800
-              prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-lg prose-pre:p-4 prose-pre:overflow-x-auto
-              prose-li:text-gray-700
-              prose-img:rounded-lg prose-img:shadow-md
-            ">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {article.content}
-              </ReactMarkdown>
-            </article>
-
-            {/* Mobile action buttons */}
-            <div className="lg:hidden flex items-center gap-2 py-4 border-t border-gray-200 overflow-x-auto">
+          <aside className="hidden lg:col-span-1 lg:flex">
+            <div className="sticky top-8 flex h-fit flex-col items-center gap-1 rounded-xl border border-gray-100 bg-white p-2 shadow-sm">
+              {/* Like */}
               <button
                 type="button"
                 onClick={handleLike}
                 disabled={isLiking}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer",
+                title={
                   isLiked
-                    ? "border-red-200 bg-red-50 text-red-500 hover:bg-red-100"
-                    : "border-gray-200 text-gray-700 hover:bg-gray-50",
+                    ? "Unlike"
+                    : "Like"
+                }
+                aria-label={
+                  isLiked
+                    ? "Unlike article"
+                    : "Like article"
+                }
+                className={cn(
+                  "flex w-14 flex-col items-center gap-1 rounded-lg p-2.5 transition",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  isLiked
+                    ? "bg-red-50 text-red-500"
+                    : "text-gray-400 hover:bg-gray-50 hover:text-red-500",
                 )}
-                aria-label={isLiked ? "Unlike article" : "Like article"}
               >
                 {isLiked ? (
-                  <AiFillHeart className="w-5 h-5 text-red-500" />
+                  <AiFillHeart className="h-5 w-5" />
                 ) : (
-                  <AiOutlineHeart className="w-5 h-5 text-gray-500" />
+                  <AiOutlineHeart className="h-5 w-5" />
                 )}
-                <span className={cn("text-sm font-semibold", isLiked && "text-red-600")}>{likeCount}</span>
+
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold",
+                    isLiked
+                      ? "text-red-600"
+                      : "text-gray-500",
+                  )}
+                >
+                  {likeCount}
+                </span>
               </button>
 
+              {/* Comments */}
               <button
                 type="button"
-                onClick={handleBookmark}
+                onClick={() =>
+                  document
+                    .getElementById(
+                      "comments-section",
+                    )
+                    ?.scrollIntoView({
+                      behavior:
+                        "smooth",
+                    })
+                }
+                title="Comments"
+                aria-label="Jump to comments"
+                className="flex w-14 flex-col items-center gap-1 rounded-lg p-2.5 text-gray-400 transition hover:bg-gray-50 hover:text-primary"
+              >
+                <AiOutlineComment className="h-5 w-5" />
+
+                <span className="text-[11px] font-semibold text-gray-500">
+                  {commentCount}
+                </span>
+              </button>
+
+              {/* Bookmark */}
+              <button
+                type="button"
+                onClick={
+                  handleBookmark
+                }
                 disabled={isSaving}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors disabled:opacity-50 whitespace-nowrap cursor-pointer",
+                title={
                   isBookmarked
-                    ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15"
-                    : "border-gray-200 text-gray-700 hover:bg-gray-50",
+                    ? "Remove bookmark"
+                    : "Bookmark"
+                }
+                aria-label={
+                  isBookmarked
+                    ? "Remove bookmark"
+                    : "Bookmark"
+                }
+                className={cn(
+                  "flex w-14 flex-col items-center gap-1 rounded-lg p-2.5 transition",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  isBookmarked
+                    ? "bg-primary/10 text-primary"
+                    : "text-gray-400 hover:bg-gray-50 hover:text-primary",
                 )}
-                aria-label={isBookmarked ? "Remove bookmark" : "Bookmark"}
               >
                 {isBookmarked ? (
-                  <LuBookmarkCheck className="w-5 h-5 text-primary" />
+                  <LuBookmarkCheck className="h-5 w-5" />
                 ) : (
-                  <LuBookmark className="w-5 h-5 text-gray-500" />
+                  <LuBookmark className="h-5 w-5" />
                 )}
               </button>
 
+              {/* Share */}
               <button
-                onClick={handleShare}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors whitespace-nowrap"
+                type="button"
+                onClick={
+                  handleShare
+                }
+                title="Share"
+                aria-label="Share article"
+                className="flex w-14 flex-col items-center gap-1 rounded-lg p-2.5 text-gray-400 transition hover:bg-gray-50 hover:text-primary"
               >
-                <AiOutlineShareAlt className="w-5 h-5" />
+                <AiOutlineShareAlt className="h-5 w-5" />
+              </button>
+
+              {/* More */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowMoreMenu(
+                      (previous) =>
+                        !previous,
+                    )
+                  }
+                  title="More options"
+                  aria-label="More article options"
+                  className="flex w-14 flex-col items-center gap-1 rounded-lg p-2.5 text-gray-400 transition hover:bg-gray-50 hover:text-primary"
+                >
+                  <HiOutlineEllipsisHorizontal className="h-5 w-5" />
+                </button>
+
+                {showMoreMenu && (
+                  <div className="absolute left-16 top-0 z-50 min-w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+                    {isAuthor ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={
+                            handleEdit
+                          }
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Edit Article
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowMoreMenu(
+                              false,
+                            );
+                            void handleDelete();
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+                        >
+                          Delete Article
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowMoreMenu(
+                              false,
+                            )
+                          }
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Report Article
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowMoreMenu(
+                              false,
+                            )
+                          }
+                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Block Author
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+
+          {/* ================================================================ */}
+          {/* MAIN ARTICLE                                                      */}
+          {/* ================================================================ */}
+
+          <main className="w-full lg:col-span-6">
+            {/* Article header */}
+            <header className="space-y-5">
+              <h1 className="text-4xl font-black leading-tight tracking-tight text-gray-900 sm:text-5xl">
+                {article.title}
+              </h1>
+
+              {article.excerpt && (
+                <p className="max-w-2xl text-base leading-7 text-gray-600">
+                  {article.excerpt}
+                </p>
+              )}
+
+              {/* Tags */}
+              {article.tagNames &&
+                article.tagNames.length >
+                  0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {article.tagNames.map(
+                      (tag) => (
+                        <Tag
+                          key={tag}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {tag}
+                        </Tag>
+                      ),
+                    )}
+                  </div>
+                )}
+            </header>
+
+            <div className="my-6 flex items-center justify-between border-y border-gray-200 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar
+                  src={
+                    article.authorAvatar
+                  }
+                  alt={
+                    article.authorName ??
+                    "Author"
+                  }
+                  name={
+                    article.authorName ??
+                    "Author"
+                  }
+                  size="md"
+                  className="h-11 w-11"
+                />
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {article.authorName ??
+                      "DevSpace Author"}
+                  </p>
+
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>
+                      {formattedDate}
+                    </span>
+
+                    <span>·</span>
+
+                    <span className="flex items-center gap-1">
+                      <LuClock className="h-3 w-3" />
+                      {readingTime} min
+                      read
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {!isAuthor && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="ml-4 shrink-0"
+                >
+                  Follow
+                </Button>
+              )}
+            </div>
+
+
+            {coverImage && (
+              <div className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+                <img
+                  src={coverImage}
+                  alt={article.title}
+                  className="h-auto max-h-125 w-full object-cover"
+                />
+              </div>
+            )}
+
+          
+
+            <article
+              className="
+                prose
+                prose-sm
+                max-w-none
+                prose-headings:font-bold
+                prose-headings:text-gray-900
+                prose-headings:tracking-tight
+                prose-headings:mt-8
+                prose-headings:mb-4
+                prose-p:text-gray-700
+                prose-p:leading-7
+                prose-a:text-primary
+                prose-a:no-underline
+                hover:prose-a:underline
+                prose-strong:text-gray-900
+                prose-blockquote:border-primary
+                prose-blockquote:text-gray-600
+                prose-code:rounded
+                prose-code:bg-gray-100
+                prose-code:px-1.5
+                prose-code:py-0.5
+                prose-code:text-sm
+                prose-code:text-gray-800
+                prose-pre:overflow-x-auto
+                prose-pre:rounded-xl
+                prose-pre:bg-gray-900
+                prose-pre:p-5
+                prose-li:text-gray-700
+                prose-img:rounded-xl
+                prose-img:shadow-sm
+              "
+            >
+              <ReactMarkdown
+                remarkPlugins={[
+                  remarkGfm,
+                ]}
+              >
+                {article.content}
+              </ReactMarkdown>
+            </article>
+
+            
+
+
+            <div className="mt-8 flex items-center gap-2 overflow-x-auto border-t border-gray-200 py-4 lg:hidden">
+              {/* Like */}
+              <button
+                type="button"
+                onClick={
+                  handleLike
+                }
+                disabled={isLiking}
+                className={cn(
+                  "flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2 transition",
+                  isLiked
+                    ? "border-red-200 bg-red-50 text-red-500"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50",
+                )}
+              >
+                {isLiked ? (
+                  <AiFillHeart className="h-5 w-5" />
+                ) : (
+                  <AiOutlineHeart className="h-5 w-5" />
+                )}
+
+                <span className="text-sm font-semibold">
+                  {likeCount}
+                </span>
+              </button>
+
+              {/* Comments */}
+              <button
+                type="button"
+                onClick={() =>
+                  document
+                    .getElementById(
+                      "comments-section",
+                    )
+                    ?.scrollIntoView({
+                      behavior:
+                        "smooth",
+                    })
+                }
+                className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-gray-600 transition hover:bg-gray-50"
+              >
+                <AiOutlineComment className="h-5 w-5" />
+
+                <span className="text-sm font-semibold">
+                  {commentCount}
+                </span>
+              </button>
+
+              {/* Bookmark */}
+              <button
+                type="button"
+                onClick={
+                  handleBookmark
+                }
+                disabled={isSaving}
+                className={cn(
+                  "flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2 transition",
+                  isBookmarked
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50",
+                )}
+              >
+                {isBookmarked ? (
+                  <LuBookmarkCheck className="h-5 w-5" />
+                ) : (
+                  <LuBookmark className="h-5 w-5" />
+                )}
+              </button>
+
+              {/* Share */}
+              <button
+                type="button"
+                onClick={
+                  handleShare
+                }
+                className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-gray-600 transition hover:bg-gray-50"
+              >
+                <AiOutlineShareAlt className="h-5 w-5" />
               </button>
             </div>
-          </div>
 
-          {/* Right Sidebar */}
-          <div className="hidden lg:flex lg:col-span-5 flex-col gap-8 sticky top-8 h-fit">
-            {/* Author Card */}
+            
+
+
+            <div
+              id="comments-section"
+              className="mt-8 border-t border-gray-200 pt-8 lg:hidden"
+            >
+              <h2 className="mb-5 text-lg font-bold text-gray-900">
+                Comments{" "}
+                <span className="font-normal text-gray-400">
+                  ({commentCount})
+                </span>
+              </h2>
+
+              <ArticleComments
+                articleId={article.id}
+                onCommentCountChange={
+                  setCommentCount
+                }
+              />
+            </div>
+          </main>
+
+        
+
+          <aside className="hidden lg:col-span-5 lg:flex lg:flex-col lg:gap-8">
+            {/* Author */}
             <AuthorCard
-              authorId={article.authorId}
-              authorName={article.authorName}
-              authorAvatar={article.authorAvatar}
+              authorId={
+                article.authorId
+              }
+              authorName={
+                article.authorName
+              }
+              authorAvatar={
+                article.authorAvatar
+              }
               isAuthor={isAuthor}
             />
 
-            {/* Related Articles */}
-            <RelatedArticles currentArticleId={article.id} />
-            {/* Comments section */}
-            <div id="comments-section" className="space-y-6 pt-8 border-t border-gray-200">
+            {/* Related */}
+            <RelatedArticles
+              currentArticleId={
+                article.id
+              }
+            />
+
+           
+           
+
+            <div
+              id="comments-section"
+              className="border-t border-gray-200 pt-8"
+            >
+              <h2 className="mb-5 text-lg font-bold text-gray-900">
+                Comments{" "}
+                <span className="font-normal text-gray-400">
+                  ({commentCount})
+                </span>
+              </h2>
+
               <ArticleComments
-                articleId={article.id}
-                onCommentCountChange={setCommentCount}
-              />
+                  articleId={article.id}
+                  onCommentCountChange={setCommentCount}
+                />
+
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </div>

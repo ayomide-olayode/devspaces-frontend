@@ -1,15 +1,19 @@
-
 import { useState, useEffect, type JSX } from "react";
 
 import { Avatar, Button, Skeleton } from "@/components/common";
+
 import { toast } from "@/hooks/useToast";
+
 import { useAuthStore } from "@/stores/useAuthStore";
+
 import { AiOutlineLike } from "react-icons/ai";
+
 import {
   getArticleComments,
   createComment,
   type Comment,
 } from "@/features/articles/api/articleApi";
+
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface ArticleCommentsProps {
@@ -37,9 +41,11 @@ export function ArticleComments({
         const data = await getArticleComments(articleId);
 
         setComments(data);
+
         onCommentCountChange?.(data.length);
       } catch (err: unknown) {
         console.error("Error loading comments:", err);
+
         toast.error(
           getApiErrorMessage(err) || "Failed to load comments"
         );
@@ -51,7 +57,9 @@ export function ArticleComments({
     loadComments();
   }, [articleId, onCommentCountChange]);
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
+  const handleSubmitComment = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
 
     if (!newComment.trim()) {
@@ -73,6 +81,7 @@ export function ArticleComments({
       );
 
       setComments((prev) => [newCommentObj, ...prev]);
+
       setNewComment("");
 
       onCommentCountChange?.(comments.length + 1);
@@ -89,8 +98,9 @@ export function ArticleComments({
     }
   };
 
-  const handleLikeComment = async (commentId: string) => {
-
+  const handleLikeComment = async (
+    commentId: string
+  ) => {
     setComments((prev) =>
       prev.map((comment) => {
         if (comment.id === commentId) {
@@ -112,11 +122,17 @@ export function ArticleComments({
       (now.getTime() - date.getTime()) / 1000
     );
 
-    if (diffInSeconds < 60) return "just now";
-    if (diffInSeconds < 3600)
+    if (diffInSeconds < 60) {
+      return "just now";
+    }
+
+    if (diffInSeconds < 3600) {
       return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400)
+    }
+
+    if (diffInSeconds < 86400) {
       return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    }
 
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
@@ -125,9 +141,6 @@ export function ArticleComments({
     <div
       className="
         w-full
-        sm:w-[70%]
-        md:w-[55%]
-        lg:w-2/4
         bg-white
         border border-gray-200
         rounded-lg
@@ -144,18 +157,23 @@ export function ArticleComments({
 
       {/* Comment Input */}
       {user ? (
-        <form onSubmit={handleSubmitComment} className="space-y-3">
+        <form
+          onSubmit={handleSubmitComment}
+          className="space-y-3"
+        >
           <div className="flex gap-3">
             <Avatar
               src={user.avatarUrl || undefined}
               alt={user.userName || "You"}
               size="sm"
-              className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0"
+              className="w-9 h-9 sm:w-10 sm:h-10 shrink-0"
             />
 
             <textarea
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={(e) =>
+                setNewComment(e.target.value)
+              }
               placeholder="Add a thoughtful comment..."
               className="
                 flex-1
@@ -200,10 +218,14 @@ export function ArticleComments({
               type="submit"
               variant="primary"
               size="sm"
-              disabled={isSubmitting || !newComment.trim()}
+              disabled={
+                isSubmitting || !newComment.trim()
+              }
               className="text-[10px] sm:text-xs"
             >
-              {isSubmitting ? "Posting..." : "Post Comment"}
+              {isSubmitting
+                ? "Posting..."
+                : "Post Comment"}
             </Button>
           </div>
         </form>
@@ -225,7 +247,11 @@ export function ArticleComments({
             Sign in to comment on this article.{" "}
             <a
               href="/auth/sign-in"
-              className="text-blue-600 hover:underline font-semibold"
+              className="
+                text-blue-600
+                hover:underline
+                font-semibold
+              "
             >
               Sign in here
             </a>
@@ -237,7 +263,10 @@ export function ArticleComments({
       <div className="space-y-4">
         {isLoading ? (
           Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex gap-3">
+            <div
+              key={i}
+              className="flex gap-3"
+            >
               <Skeleton
                 variant="circular"
                 width={36}
@@ -263,7 +292,8 @@ export function ArticleComments({
         ) : comments.length === 0 ? (
           <div className="py-6 text-center text-gray-500">
             <p className="text-[10px] sm:text-xs">
-              No comments yet. Be the first to share your thoughts!
+              No comments yet. Be the first to share
+              your thoughts!
             </p>
           </div>
         ) : (
@@ -284,29 +314,78 @@ export function ArticleComments({
                 src={undefined}
                 alt={comment.userId}
                 size="sm"
-                className="w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0"
+                className="
+                  w-8
+                  h-8
+                  sm:w-9
+                  sm:h-9
+                  shrink-0
+                "
               />
 
               {/* Comment Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
-                  <p className="font-semibold text-[10px] sm:text-xs text-gray-900">
+                <div
+                  className="
+                    flex
+                    flex-wrap
+                    items-center
+                    gap-x-2
+                    gap-y-0.5
+                    mb-1
+                  "
+                >
+                  <p
+                    className="
+                      font-semibold
+                      text-[10px]
+                      sm:text-xs
+                      text-gray-900
+                    "
+                  >
                     {comment.userId}
                   </p>
 
-                  <span className="text-[9px] sm:text-[10px] text-gray-400">
-                    {formatTimeAgo(comment.createdAt)}
+                  <span
+                    className="
+                      text-[9px]
+                      sm:text-[10px]
+                      text-gray-400
+                    "
+                  >
+                    {formatTimeAgo(
+                      comment.createdAt
+                    )}
                   </span>
                 </div>
 
-                <p className="text-[10px] sm:text-xs text-gray-700 leading-relaxed mb-2.5 break-words">
+                <p
+                  className="
+                    text-[10px]
+                    sm:text-xs
+                    text-gray-700
+                    leading-relaxed
+                    mb-2.5
+                    wrap-break-words
+                  "
+                >
                   {comment.message}
                 </p>
 
                 {/* Comment Actions */}
-                <div className="flex items-center gap-3 sm:gap-4">
+                <div
+                  className="
+                    flex
+                    items-center
+                    gap-3
+                    sm:gap-4
+                  "
+                >
                   <button
-                    onClick={() => handleLikeComment(comment.id)}
+                    type="button"
+                    onClick={() =>
+                      handleLikeComment(comment.id)
+                    }
                     className="
                       flex
                       items-center
@@ -319,12 +398,19 @@ export function ArticleComments({
                       group
                     "
                   >
-                    <AiOutlineLike className="w-3.5 h-3.5 group-hover:text-blue-600" />
+                    <AiOutlineLike
+                      className="
+                        w-3.5
+                        h-3.5
+                        group-hover:text-blue-600
+                      "
+                    />
 
                     <span>Like</span>
                   </button>
 
                   <button
+                    type="button"
                     className="
                       text-[9px]
                       sm:text-[10px]
