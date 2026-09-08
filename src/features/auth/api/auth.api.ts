@@ -12,6 +12,11 @@ import type {
   ResendOtpPayload,
   LogoutPayload,
 } from "@/types/auth.types";
+import axios from "axios";
+
+export interface RefreshTokenPayload {
+  refreshToken: string;
+}
 
 /**
  * Registers a new user with their personal details and credentials.
@@ -91,5 +96,12 @@ export async function handleOAuthCallback(
     provider === "google" ? ENDPOINTS.AUTH.GOOGLE_CALLBACK : ENDPOINTS.AUTH.GITHUB_CALLBACK;
 
   const response = await apiClient.post<AuthResponse>(endpoint, payload);
+  return response.data;
+}
+
+export async function refreshAccessToken(payload: RefreshTokenPayload): Promise<AuthResponse> {
+  const response = await axios.post<AuthResponse>(ENDPOINTS.AUTH.REFRESH_TOKEN, payload, {
+    headers: { "Content-Type": "application/json" },
+  });
   return response.data;
 }

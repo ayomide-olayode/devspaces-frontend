@@ -1,11 +1,18 @@
-import { useState, type JSX } from "react";
+import { useState, useEffect, type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { AiOutlineHeart, AiFillHeart } from "react-icons/ai";
 import { FiMessageCircle, FiMoreHorizontal } from "react-icons/fi";
 import { LuBookmark, LuBookmarkCheck, LuClock } from "react-icons/lu";
 import { Avatar } from "@/components/common";
-import { likeArticle } from "@/features/articles/api/articleApi";
+import { toast } from "@/hooks/useToast";
 import articlePlaceholder from "@/assets/images/article-placeholder.jpg";
+import {
+  getUserProfileById,
+  formatProfileName,
+  getProfileAvatar,
+  getProfileRole,
+  type UserProfile,
+} from "@/lib/api/user.api";
 
 export interface ArticleCardProps {
   id: string;
@@ -25,6 +32,7 @@ export interface ArticleCardProps {
   targetHref?: string;
   /** When true, clicking card navigates to edit mode /articles/:id/edit */
   isEditable?: boolean;
+  status?: "draft" | "published" | 0 | 1 | string | number;
   createdAt: string;
   readTimeMinutes?: number;
   likes?: number;
@@ -36,6 +44,19 @@ export interface ArticleCardProps {
   /** "horizontal" = feed list row · "vertical" = grid card */
   variant?: "horizontal" | "vertical";
 }
+
+const getStatusLabel = (
+  status?: "draft" | "published" | 0 | 1 | string | number,
+): "published" | "draft" | null => {
+  if (typeof status === "string") {
+    const normalized = status.trim().toLowerCase();
+    if (normalized === "published" || normalized === "1") return "published";
+    if (normalized === "draft" || normalized === "0") return "draft";
+  }
+  if (status === 1) return "published";
+  if (status === 0) return "draft";
+  return null;
+};
 
 function DifficultyDots({ readingTime = 0 }: { readingTime?: number }): JSX.Element {
   const filled = readingTime <= 3 ? 1 : readingTime <= 6 ? 2 : readingTime <= 10 ? 3 : 4;
@@ -58,19 +79,20 @@ function CoverImage({
   alt,
   className,
 }: {
-  src?: string;
+  src?: string | null;
   alt: string;
   className: string;
 }): JSX.Element {
+  const [hasError, setHasError] = useState(false);
+
   return (
     <div className={`overflow-hidden bg-slate-900 ${className}`}>
       <img
-        src={src || articlePlaceholder}
+        key={src ?? "placeholder"}
+        src={hasError || !src ? articlePlaceholder : src}
         alt={alt}
         className="w-full h-full object-cover"
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = articlePlaceholder;
-        }}
+        onError={() => setHasError(true)}
       />
     </div>
   );
@@ -90,6 +112,7 @@ export function ArticleCard({
   authorLink,
   targetHref,
   isEditable = false,
+  status,
   createdAt,
   readTimeMinutes = 4,
   likes = 0,
@@ -101,31 +124,50 @@ export function ArticleCard({
   variant = "horizontal",
 }: ArticleCardProps): JSX.Element {
   const navigate = useNavigate();
+  const [likedOverride, setLikedOverride] = useState<boolean | null>(null);
+  const [likeOffset, setLikeOffset] = useState<number>(0);
   const [isLiking, setIsLiking] = useState<boolean>(false);
-  const [prevLiked, setPrevLiked] = useState<boolean>(isLiked);
-  const [prevLikes, setPrevLikes] = useState<number>(likes);
-  const [internalLiked, setInternalLiked] = useState<boolean>(isLiked);
-  const [internalLikes, setInternalLikes] = useState<number>(likes);
+  const [fetchedProfile, setFetchedProfile] = useState<UserProfile | null>(null);
 
-  if (prevLiked !== isLiked) {
-    setPrevLiked(isLiked);
-    setInternalLiked(isLiked);
-  }
-  if (prevLikes !== likes) {
-    setPrevLikes(likes);
-    setInternalLikes(likes);
-  }
-
-  const hasLiked = onLike ? isLiked : internalLiked;
-  const currentLikes = onLike ? likes : internalLikes;
+  const statusLabel = getStatusLabel(status);
 
   const isAvatarLinkEnabled = Boolean(isAvatarLink || authorLink);
   const targetAuthorHref = authorLink || (authorId ? `/profile/${authorId}` : "/profile");
   const destinationHref = targetHref || (isEditable ? `/articles/${id}/edit` : `/articles/${id}`);
 
-  const displayAuthorName = authorName || "DevSpace Author";
-  const displayAuthorAvatar = authorAvatar;
-  const displayAuthorRole = authorRole;
+  const hasLiked = likedOverride !== null ? likedOverride : isLiked;
+  const localLikes = Math.max(0, likes + likeOffset);
+
+  useEffect(() => {
+    if (!authorId || (authorName && authorName !== "DevSpace Author")) {
+      return;
+    }
+    let cancelled = false;
+
+    async function loadAuthorProfile(): Promise<void> {
+      try {
+        const profile = await getUserProfileById(authorId as string);
+        if (!cancelled) {
+          setFetchedProfile(profile);
+        }
+      } catch {
+        // Keep fallback values gracefully on network failure
+      }
+    }
+
+    void loadAuthorProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [authorId, authorName]);
+
+  const displayAuthorName =
+    authorName && authorName !== "DevSpace Author"
+      ? authorName
+      : formatProfileName(fetchedProfile, authorName || "DevSpace Author");
+
+  const displayAuthorAvatar = authorAvatar ?? getProfileAvatar(fetchedProfile);
+  const displayAuthorRole = authorRole ?? getProfileRole(fetchedProfile);
 
   const formattedDate = new Date(createdAt).toLocaleDateString("en-US", {
     month: "short",
@@ -156,21 +198,19 @@ export function ArticleCard({
     e.preventDefault();
     e.stopPropagation();
     if (isLiking) return;
+    const wasLiked = hasLiked;
+    const offsetDelta = wasLiked ? -1 : 1;
+    // Optimistic toggle
+    setLikedOverride(!wasLiked);
+    setLikeOffset((prev) => prev + offsetDelta);
     setIsLiking(true);
     try {
-      if (onLike) {
-        await onLike(id);
-      } else {
-        const wasLiked = internalLiked;
-        setInternalLiked(!wasLiked);
-        setInternalLikes((prev) => Math.max(0, prev + (wasLiked ? -1 : 1)));
-        await likeArticle(id);
-      }
+      if (onLike) await onLike(id);
     } catch {
-      if (!onLike) {
-        setInternalLiked(isLiked);
-        setInternalLikes(likes);
-      }
+      // Revert on failure
+      setLikedOverride(wasLiked);
+      setLikeOffset((prev) => prev - offsetDelta);
+      toast.error("Failed to update like status");
     } finally {
       setIsLiking(false);
     }
@@ -201,18 +241,37 @@ export function ArticleCard({
         />
 
         <div className="p-4 flex flex-col flex-1 gap-3">
-          {/* Author */}
-          <div className="flex items-center gap-2">
-            <Avatar
-              src={displayAuthorAvatar}
-              name={displayAuthorName}
-              size="xs"
-              href={isAvatarLinkEnabled ? targetAuthorHref : undefined}
-            />
-            <div className="leading-tight">
-              <p className="text-xs font-semibold text-text">{displayAuthorName}</p>
-              <p className="text-[11px] text-text/50">{authorMeta || formattedDate}</p>
+          {/* Author & Status */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Avatar
+                src={displayAuthorAvatar}
+                name={displayAuthorName}
+                size="xs"
+                href={isAvatarLinkEnabled ? targetAuthorHref : undefined}
+              />
+              <div className="leading-tight min-w-0">
+                <p className="text-xs font-semibold text-text truncate">{displayAuthorName}</p>
+                <p className="text-[11px] text-text/50 truncate">{authorMeta || formattedDate}</p>
+              </div>
             </div>
+
+            {statusLabel && (
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${
+                  statusLabel === "published"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    statusLabel === "published" ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                />
+                {statusLabel === "published" ? "Published" : "Draft"}
+              </span>
+            )}
           </div>
 
           {/* Title */}
@@ -255,7 +314,7 @@ export function ArticleCard({
                 ) : (
                   <AiOutlineHeart className="w-3.5 h-3.5" />
                 )}
-                <span>{currentLikes}</span>
+                <span>{localLikes}</span>
               </button>
 
               {/* Comments */}
@@ -320,17 +379,37 @@ export function ArticleCard({
             <p className="text-xs text-text/50">{authorMeta || formattedDate}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          className="p-1.5 rounded-lg text-text/40 hover:text-text hover:bg-slate-100 transition-colors"
-          aria-label="More options"
-        >
-          <FiMoreHorizontal className="w-4 h-4" />
-        </button>
+
+        <div className="flex items-center gap-2">
+          {statusLabel && (
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                statusLabel === "published"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  statusLabel === "published" ? "bg-emerald-500" : "bg-amber-500"
+                }`}
+              />
+              {statusLabel === "published" ? "Published" : "Draft"}
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="p-1.5 rounded-lg text-text/40 hover:text-text hover:bg-slate-100 transition-colors"
+            aria-label="More options"
+          >
+            <FiMoreHorizontal className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Body: text + image (image hidden on mobile) */}
@@ -389,7 +468,7 @@ export function ArticleCard({
             ) : (
               <AiOutlineHeart className="w-4 h-4" />
             )}
-            <span className="text-xs font-medium">{currentLikes}</span>
+            <span className="text-xs font-medium">{localLikes}</span>
           </button>
 
           {/* Comments */}

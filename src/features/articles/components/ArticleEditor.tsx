@@ -744,7 +744,11 @@ export function ArticleEditor({
               </div>
 
               {/* Formatted Content Body */}
-              <div className="prose prose-slate max-w-none text-xs sm:text-sm text-text/80 space-y-3">
+              <div
+                className="prose prose-slate  w-full
+                max-w-none
+                wrap-break-word text-xs sm:text-sm text-text/80 space-y-3"
+              >
                 {contentValue.trim() ? (
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}

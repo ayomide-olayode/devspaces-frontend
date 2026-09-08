@@ -29,26 +29,86 @@ const syncStoredProfile = (user?: AuthUser | null) => {
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (token: string, user?: AuthUser) => void;
+  setAuth: (
+    token: string,
+    refreshTokenOrUser?: string | AuthUser | null,
+    maybeUser?: AuthUser,
+  ) => void;
+  setTokens: (token: string, refreshToken?: string | null) => void;
   logout: () => void;
 }
 
+const getInitialUser = (): AuthUser | null => {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("devspace_user");
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as AuthUser;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
+  user: getInitialUser(),
   token: typeof window !== "undefined" ? localStorage.getItem("devspace_token") : null,
+  refreshToken:
+    typeof window !== "undefined" ? localStorage.getItem("devspace_refresh_token") : null,
   isAuthenticated:
     typeof window !== "undefined" ? Boolean(localStorage.getItem("devspace_token")) : false,
-  setAuth: (token, user) => {
+
+  setAuth: (token, refreshTokenOrUser, maybeUser) => {
     localStorage.setItem("devspace_token", token);
-    const normalizedUser = user ?? null;
-    syncStoredProfile(normalizedUser);
-    set({ token, user: normalizedUser, isAuthenticated: true });
+
+    let refreshToken: string | null = null;
+    let user: AuthUser | null = null;
+
+    if (typeof refreshTokenOrUser === "string") {
+      refreshToken = refreshTokenOrUser;
+      user = maybeUser ?? null;
+    } else if (refreshTokenOrUser && typeof refreshTokenOrUser === "object") {
+      user = refreshTokenOrUser;
+    }
+
+    if (refreshToken) {
+      localStorage.setItem("devspace_refresh_token", refreshToken);
+    }
+
+    if (user) {
+      localStorage.setItem("devspace_user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("devspace_user");
+    }
+
+    syncStoredProfile(user);
+    set({
+      token,
+      refreshToken: refreshToken ?? (typeof window !== "undefined" ? localStorage.getItem("devspace_refresh_token") : null),
+      user,
+      isAuthenticated: true,
+    });
   },
+
+  setTokens: (token, refreshToken) => {
+    localStorage.setItem("devspace_token", token);
+    if (refreshToken) {
+      localStorage.setItem("devspace_refresh_token", refreshToken);
+    }
+    set((state) => ({
+      token,
+      refreshToken: refreshToken ?? state.refreshToken,
+      isAuthenticated: true,
+    }));
+  },
+
   logout: () => {
     localStorage.removeItem("devspace_token");
+    localStorage.removeItem("devspace_refresh_token");
     localStorage.removeItem("devspace_avatar");
+    localStorage.removeItem("devspace_user");
     localStorage.removeItem("devspace_user_name");
-    set({ user: null, token: null, isAuthenticated: false });
+    set({ user: null, token: null, refreshToken: null, isAuthenticated: false });
   },
 }));

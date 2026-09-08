@@ -16,32 +16,105 @@ export interface UserProfile {
   profilePictureUrl?: string | null;
   role?: string;
   bio?: string;
+  totalFollowers?: number;
+  totalFollowed?: number;
+  following?: boolean;
+  isFollowing?: boolean;
+  followersCount?: number | string;
+  followingCount?: number | string;
+  articlesCount?: number | string;
+  resourcesCount?: number | string;
   [key: string]: unknown;
+}
+
+export interface FollowResponse {
+  isFollowing?: boolean;
+  followersCount?: number;
+  message?: string;
 }
 
 export async function getUserProfile(id?: string): Promise<UserProfile> {
   const currentAuthUser = useAuthStore.getState().user;
+  const isOwn = !id || (currentAuthUser?.id && id === currentAuthUser.id);
 
-  // If requesting the logged-in user's own profile
-  if (!id || (currentAuthUser?.id && id === currentAuthUser.id)) {
-    const response = await apiClient.get<UserProfile>(ENDPOINTS.USER.PROFILE);
-    return response.data;
+  if (isOwn) {
+    let profileData: UserProfile = {};
+    try {
+      const response = await apiClient.get<Record<string, unknown>>(ENDPOINTS.USER.PROFILE);
+      if (response.data && typeof response.data === "object") {
+        if ("data" in response.data && response.data.data && typeof response.data.data === "object") {
+          profileData = response.data.data as UserProfile;
+        } else if ("user" in response.data && response.data.user && typeof response.data.user === "object") {
+          profileData = response.data.user as UserProfile;
+        } else {
+          profileData = response.data as UserProfile;
+        }
+      }
+    } catch {
+      // Ignore user profile failure and try author details
+    }
+
+    const targetAuthorId =
+      id ||
+      (profileData.id as string | undefined) ||
+      (profileData.userId as string | undefined) ||
+      currentAuthUser?.id;
+
+    if (
+      targetAuthorId &&
+      (profileData.totalFollowers === undefined || profileData.totalFollowed === undefined)
+    ) {
+      try {
+        const authorRes = await apiClient.get<Record<string, unknown>>(
+          ENDPOINTS.AUTHORS.DETAIL(targetAuthorId),
+        );
+        let authorData: UserProfile = {};
+        if (authorRes.data && typeof authorRes.data === "object") {
+          if ("data" in authorRes.data && authorRes.data.data && typeof authorRes.data.data === "object") {
+            authorData = authorRes.data.data as UserProfile;
+          } else {
+            authorData = authorRes.data as UserProfile;
+          }
+        }
+        profileData = { ...authorData, ...profileData, ...authorData };
+      } catch {
+        // Author detail fallback optional
+      }
+    }
+
+    if (Object.keys(profileData).length > 0) {
+      return profileData;
+    }
   }
 
-  // If requesting another author's profile, query by specific ID route
+  // If requesting another author's profile, query GET /api/authors/{id}
   try {
-    const response = await apiClient.get<UserProfile>(`/api/User/${id}`);
-    if (response.data) {
-      return response.data;
+    const response = await apiClient.get<Record<string, unknown>>(
+      ENDPOINTS.AUTHORS.DETAIL(id || ""),
+    );
+    if (response.data && typeof response.data === "object") {
+      if ("data" in response.data && response.data.data && typeof response.data.data === "object") {
+        return response.data.data as UserProfile;
+      }
+      return response.data as UserProfile;
     }
   } catch {
-    // Endpoint may not be available for other users
+    // Fallback
   }
 
   return { id };
 }
 
 const profileCache = new Map<string, Promise<UserProfile>>();
+
+// follow user API
+
+  export async function followAuthor(authorId: string): Promise<FollowResponse> {
+    const response = await apiClient.post<FollowResponse>(ENDPOINTS.AUTHORS.FOLLOW(authorId),
+  {}
+);
+    return response.data;
+  }
 
 /**
  * Fetches a user profile with deduplication and in-memory caching by user ID.

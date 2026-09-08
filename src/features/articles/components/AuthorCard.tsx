@@ -24,7 +24,7 @@ export interface AuthorCardProps {
 
 export function AuthorCard({
   authorId,
-  authorName,
+  authorName ="DevSpace Author",
   authorAvatar,
   authorRole,
   company,
@@ -38,7 +38,9 @@ export function AuthorCard({
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!authorId) return;
+     if (!authorId || (authorName && authorName !== "DevSpace Author")) {
+       return;
+     }
 
     let isSubscribed = true;
 
@@ -62,14 +64,15 @@ export function AuthorCard({
     return () => {
       isSubscribed = false;
     };
-  }, [authorId]);
+  }, [authorId, authorName]);
 
-  const displayName = formatProfileName(
-    profile,
-    authorName && authorName !== "DevSpace Author" ? authorName : (authorName || "Author"),
-  );
-  const displayAvatar = authorAvatar || getProfileAvatar(profile);
-  const displayRole = authorRole || getProfileRole(profile) || "Community Author";
+  const displayName =
+    authorName && authorName !== "DevSpace Author"
+      ? authorName
+      : formatProfileName(profile, authorName || "DevSpace Author");
+  
+  const displayAvatar = authorAvatar ?? getProfileAvatar(profile);
+  const displayRole = authorRole ?? getProfileRole(profile) ??"Community Author";
   const rawCompany = company || (profile?.company as string | undefined) || "";
   const displayCompany = rawCompany ? (rawCompany.startsWith("@") ? rawCompany : `@ ${rawCompany}`) : "";
 
@@ -79,11 +82,17 @@ export function AuthorCard({
     "Building accessible, resilient, and performant web applications.";
 
   const totalArticles =
-    articlesCount ?? (profile?.articlesCount as number | string | undefined) ?? 62;
+    articlesCount ?? (profile?.articlesCount as number | string | undefined) ?? 0;
   const totalFollowers =
-    followersCount ?? (profile?.followersCount as number | string | undefined) ?? "12k";
+    followersCount ??
+    (profile?.totalFollowers as number | string | undefined) ??
+    (profile?.followersCount as number | string | undefined) ??
+    0;
   const totalFollowing =
-    followingCount ?? (profile?.followingCount as number | string | undefined) ?? 301;
+    followingCount ??
+    (profile?.totalFollowed as number | string | undefined) ??
+    (profile?.followingCount as number | string | undefined) ??
+    0;
 
   const profileUrl = isAuthor
     ? "/profile"

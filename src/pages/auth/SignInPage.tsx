@@ -58,7 +58,7 @@ export default function SignInPage() {
       });
       if (res && (res.accessToken || res.success)) {
         if (res.accessToken) localStorage.setItem("devspace_token", res.accessToken);
-        if (res.refreshToken) localStorage.setItem("devspace_refresh", res.refreshToken);
+        if (res.refreshToken) localStorage.setItem("devspace_refresh_token", res.refreshToken);
 
         const userFromApi = res.user ?? {
           id: res.userId,
@@ -70,7 +70,7 @@ export default function SignInPage() {
           avatarUrl: res.avatarUrl ?? null,
         };
 
-        setAuth(res.accessToken ?? "", userFromApi);
+        setAuth(res.accessToken ?? "", res.refreshToken ?? null, userFromApi);
         toast.success(res.message ?? "Welcome back to DevSpace!");
         reset();
         navigate(redirectPath, { replace: true });

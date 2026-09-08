@@ -19,7 +19,9 @@ interface DisplayArticle {
   category?: string;
   coverImage?: string;
   status?: "draft" | "published" | "scheduled" | "archived";
+  authorInfo?: string[];
   authorName?: string;
+  authoruserName?: string;
   authorAvatar?: string;
   authorRole?: string;
   createdAt: string;
@@ -29,25 +31,30 @@ interface DisplayArticle {
   isLiked?: boolean;
 }
 
-function getArticleAuthor(art: Article): { name: string; avatar?: string } {
+function getArticleAuthor(art: Article): { name: string; userName: string; avatar?: string } {
   if (art.author && typeof art.author === "object") {
     const a = art.author;
-    const name = (a.name && a.name.trim()) || (a.userName && a.userName.trim());
+    const name =(a.userName && a.userName.trim()) || (a.name && a.name.trim());
     if (name) {
       return {
         name,
         avatar: a.avatarUrl || undefined,
+        userName: a.userName as string
       };
     }
   }
   if (typeof art.authorName === "string" && art.authorName.trim()) {
-    return { name: art.authorName.trim() };
+    return {
+      name: art.authorName.trim(),
+      avatar: undefined,
+      userName: "" as string
+    };
   }
-  return { name: "DevSpace Author" };
+  return { name: "DevSpace Author", userName: "devspace", avatar: undefined };
 }
 
 function mapArticle(art: Article): DisplayArticle {
-  const { name: authorName, avatar: authorAvatar } = getArticleAuthor(art);
+  const { name: authoruserName, avatar: authorAvatar } = getArticleAuthor(art);
   const raw = art as unknown as Record<string, unknown>;
 
   const likeCount =
@@ -88,7 +95,7 @@ function mapArticle(art: Article): DisplayArticle {
     category: art.series || "General",
     coverImage: art.coverImageUrl || art.coverImage,
     status: art.status as DisplayArticle["status"],
-    authorName,
+    authoruserName,
     authorAvatar: authorAvatar || (art as unknown as { authorAvatar?: string }).authorAvatar,
     authorRole: undefined,
     createdAt: art.createdAt || new Date().toISOString(),
@@ -480,7 +487,7 @@ export function ArticlesPage(): JSX.Element {
               excerpt={article.excerpt}
               tagNames={article.tagNames}
               coverImage={article.coverImage}
-              authorName={article.authorName}
+              authorName={article.authoruserName}
               authorAvatar={article.authorAvatar}
               authorRole={article.authorRole}
               createdAt={article.createdAt}
@@ -507,7 +514,7 @@ export function ArticlesPage(): JSX.Element {
               excerpt={article.excerpt}
               tagNames={article.tagNames}
               coverImage={article.coverImage}
-              authorName={article.authorName}
+              authorName={article.authoruserName}
               authorAvatar={article.authorAvatar}
               authorRole={article.authorRole}
               createdAt={article.createdAt}

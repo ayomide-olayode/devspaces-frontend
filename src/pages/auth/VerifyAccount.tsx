@@ -67,7 +67,7 @@ export default function VerifyAccount() {
 
       const authToken = response.token || response.accessToken;
       if (authToken) {
-        setAuth(authToken, response.user);
+        setAuth(authToken, response.refreshToken ?? null, response.user);
         toast.success(response.message || "Account verified successfully! Welcome to DevSpace.");
         navigate("/playground");
       } else {

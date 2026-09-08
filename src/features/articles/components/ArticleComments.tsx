@@ -186,7 +186,6 @@ export function ArticleComments({
                 sm:text-xs
                 focus:ring-2
                 focus:ring-blue-500
-                focus:border-transparent
                 resize-none
                 outline-none
                 transition-all
@@ -305,8 +304,6 @@ export function ArticleComments({
                 gap-3
                 pb-4
                 border-b border-gray-100
-                last:border-b-0
-                last:pb-0
               "
             >
               {/* Avatar */}

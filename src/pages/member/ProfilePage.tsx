@@ -17,24 +17,19 @@ import {
   FiCheck,
 } from "react-icons/fi";
 import { BsPatchCheckFill } from "react-icons/bs";
-import {
-  Avatar,
-  Button,
-  Tabs,
-  Skeleton,
-  EmptyState,
-  type TabItem,
-} from "@/components/common";
+import { Avatar, Button, Tabs, Skeleton, EmptyState, type TabItem } from "@/components/common";
 import {
   getUserProfile,
   formatProfileName,
   getProfileAvatar,
+  followAuthor,
   type UserProfile,
 } from "@/lib/api/user.api";
 import { getArticles, getMyPosts, type Article } from "@/features/articles/api/articleApi";
 import { ArticleCard } from "@/features/articles/components/ArticleCard";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "@/hooks/useToast";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 type ProfileTab = "articles" | "resources" | "activity" | "about";
 
@@ -53,6 +48,8 @@ export default function ProfilePage(): JSX.Element {
   const [articles, setArticles] = useState<Article[]>([]);
   const [activeTab, setActiveTab] = useState<ProfileTab>("articles");
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
+  const [isFollowLoading, setIsFollowLoading] = useState<boolean>(false);
+  const [followersOffset, setFollowersOffset] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const isOwnProfile = !id || id === currentUser?.id;
@@ -71,13 +68,18 @@ export default function ProfilePage(): JSX.Element {
         if (!cancelled) {
           if (profileData.status === "fulfilled" && profileData.value) {
             setProfile(profileData.value);
+            const isFollowedInitial =
+              typeof profileData.value.following === "boolean"
+                ? profileData.value.following
+                : typeof profileData.value.isFollowing === "boolean"
+                  ? profileData.value.isFollowing
+                  : false;
+            setIsFollowing(isFollowedInitial);
           }
           if (articlesData.status === "fulfilled" && Array.isArray(articlesData.value)) {
             const fetchedArticles = articlesData.value;
             setArticles(
-              isOwnProfile
-                ? fetchedArticles
-                : fetchedArticles.filter((art) => art.authorId === id),
+              isOwnProfile ? fetchedArticles : fetchedArticles.filter((art) => art.authorId === id),
             );
           }
         }
@@ -96,14 +98,26 @@ export default function ProfilePage(): JSX.Element {
     };
   }, [id, isOwnProfile]);
 
-  const displayName = formatProfileName(
-    profile,
-    currentUser?.username || "DevSpace Member",
-  );
+  const firstArticle = articles[0];
+  const firstArticleAuthorName =
+    firstArticle?.author?.name || firstArticle?.author?.userName || firstArticle?.authorName;
+  const firstArticleUserName =
+    firstArticle?.author?.userName ||
+    (firstArticle as unknown as { authorUserName?: string })?.authorUserName;
+  const firstArticleAvatar =
+    firstArticle?.author?.avatarUrl ||
+    (firstArticle as unknown as { authorAvatar?: string })?.authorAvatar;
+
+  const defaultName = isOwnProfile
+    ? currentUser?.username || "DevSpace Member"
+    : firstArticleAuthorName || "DevSpace Author";
+
+  const displayName = formatProfileName(profile, defaultName);
+
   const username =
-    (profile?.username as string | undefined) ||
     (profile?.userName as string | undefined) ||
-    currentUser?.username ||
+    (profile?.username as string | undefined) ||
+    (isOwnProfile ? currentUser?.username : firstArticleUserName) ||
     "member";
 
   const bio =
@@ -111,28 +125,82 @@ export default function ProfilePage(): JSX.Element {
     (profile?.role as string | undefined) ||
     "Software Engineer building on DevSpace.";
 
-  const avatarUrl = getProfileAvatar(profile);
+  const avatarUrl = getProfileAvatar(profile) || (isOwnProfile ? undefined : firstArticleAvatar);
 
   const location = (profile?.location as string | undefined) || "";
   const website = (profile?.website as string | undefined) || "";
   const github = (profile?.github as string | undefined) || "";
   const twitter = (profile?.twitter as string | undefined) || "";
 
-  const followersCount = (profile?.followersCount as string | number | undefined) ?? 0;
-  const followingCount = (profile?.followingCount as string | number | undefined) ?? 0;
+  const getStatNumber = (...candidates: unknown[]): number => {
+    for (const val of candidates) {
+      if (typeof val === "number" && !isNaN(val)) return val;
+      if (typeof val === "string" && val.trim() !== "") {
+        const parsed = parseInt(val, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+    }
+    return 0;
+  };
+
+  const rawFollowers = getStatNumber(
+    profile?.totalFollowers,
+    profile?.followersCount,
+    profile?.followers,
+    profile?.followerCount,
+    (profile as Record<string, unknown> | null)?.totalFollowerCount,
+  );
+  const followersCount = Math.max(0, rawFollowers + followersOffset);
+
+  const rawFollowing = getStatNumber(
+    profile?.totalFollowed,
+    profile?.totalFollowing,
+    profile?.followingCount,
+    profile?.followedCount,
+    profile?.following,
+    (profile as Record<string, unknown> | null)?.totalFollowedCount,
+  );
+  const followingCount = rawFollowing;
+
   const articlesCount = articles.length;
   const resourcesCount = (profile?.resourcesCount as string | number | undefined) ?? 0;
 
-  const handleFollowToggle = (): void => {
-    setIsFollowing((prev) => {
-      const next = !prev;
-      if (next) {
+  const handleFollowToggle = async (): Promise<void> => {
+    const targetId = id || (profile?.id as string | undefined);
+    if (!targetId || isFollowLoading) return;
+
+    if (!currentUser) {
+      toast.error("Please sign in to follow authors");
+      return;
+    }
+
+    const previousState = isFollowing;
+    const nextState = !previousState;
+    const offsetDelta = nextState ? 1 : -1;
+
+    // Optimistic UI update
+    setIsFollowing(nextState);
+    setFollowersOffset((prev) => prev + offsetDelta);
+    setIsFollowLoading(true);
+
+    try {
+      const res = await followAuthor(targetId);
+      if (res && typeof res.isFollowing === "boolean") {
+        setIsFollowing(res.isFollowing);
+      }
+      if (nextState) {
         toast.success(`You are now following ${displayName}`);
       } else {
         toast.info(`Unfollowed ${displayName}`);
       }
-      return next;
-    });
+    } catch (err: unknown) {
+      // Revert on failure
+      setIsFollowing(previousState);
+      setFollowersOffset((prev) => prev - offsetDelta);
+      toast.error(getApiErrorMessage(err) || "Failed to update follow status");
+    } finally {
+      setIsFollowLoading(false);
+    }
   };
 
   const handleShare = async (): Promise<void> => {
@@ -178,9 +246,12 @@ export default function ProfilePage(): JSX.Element {
                 </div>
               </div>
               <div className="lg:pl-8 lg:border-l lg:border-border/60 shrink-0 w-full sm:w-auto">
-                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border border-border/60 rounded-2xl bg-white/80 overflow-hidden text-center min-w-[240px] sm:min-w-[270px]">
+                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border rounded-2xl bg-white/80 overflow-hidden text-center min-w-60 sm:min-w-67.5">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="p-3.5 sm:p-4 flex flex-col items-center justify-center gap-1.5">
+                    <div
+                      key={i}
+                      className="p-3.5 sm:p-4 flex flex-col items-center justify-center gap-1.5"
+                    >
                       <Skeleton variant="circular" width={18} height={18} />
                       <Skeleton variant="text" width={40} height={22} />
                       <Skeleton variant="text" width={50} height={12} />
@@ -194,7 +265,7 @@ export default function ProfilePage(): JSX.Element {
       ) : (
         <section className="relative bg-white border border-border/70 rounded-2xl md:rounded-3xl shadow-xs overflow-hidden">
           {/* Soft atmospheric gradient banner */}
-          <div className="h-28 sm:h-32 bg-gradient-to-r from-blue-100/60 via-purple-100/40 to-indigo-100/30" />
+          <div className="h-28 sm:h-32 bg-linear-to-r from-blue-100/60 via-purple-100/40 to-indigo-100/30" />
 
           <div className="px-6 pb-6 sm:px-8 sm:pb-8 -mt-14 sm:-mt-16">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -227,9 +298,7 @@ export default function ProfilePage(): JSX.Element {
                     <p className="text-xs sm:text-sm font-medium text-text/50">@{username}</p>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-text/80 leading-relaxed max-w-2xl">
-                    {bio}
-                  </p>
+                  <p className="text-xs sm:text-sm text-text/80 leading-relaxed max-w-2xl">{bio}</p>
 
                   {/* Social & Meta Links */}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-text/60 pt-0.5">
@@ -296,6 +365,7 @@ export default function ProfilePage(): JSX.Element {
                       <Button
                         variant={isFollowing ? "secondary" : "primary"}
                         size="sm"
+                        isLoading={isFollowLoading}
                         onClick={handleFollowToggle}
                         leftIcon={
                           isFollowing ? (
@@ -350,7 +420,7 @@ export default function ProfilePage(): JSX.Element {
 
               {/* Right: 2x2 Stats Grid */}
               <div className="lg:pl-8 lg:border-l lg:border-border/60 shrink-0 w-full sm:w-auto">
-                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border border-border/60 rounded-2xl bg-white/80 overflow-hidden text-center min-w-[240px] sm:min-w-[270px]">
+                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border rounded-2xl bg-white/80 overflow-hidden text-center min-w-60 sm:min-w-67.5">
                   {/* Followers */}
                   <div className="p-3.5 sm:p-4 flex flex-col items-center justify-center gap-1">
                     <FiUsers className="w-4.5 h-4.5 text-text/40" />
@@ -431,6 +501,7 @@ export default function ProfilePage(): JSX.Element {
                     comments={art.commentCount ?? art.comments ?? 0}
                     isLiked={Boolean(art.liked ?? art.isLiked)}
                     isEditable={isOwnProfile}
+                    status={isOwnProfile ? art.status : undefined}
                     targetHref={isOwnProfile ? `/articles/${art.id}/edit` : `/articles/${art.id}`}
                     variant="vertical"
                   />
@@ -517,7 +588,7 @@ export default function ProfilePage(): JSX.Element {
                   time: "1 week ago",
                 },
               ].map((act, index) => (
-                <div key={index} className="pt-3 first:pt-0 flex items-start justify-between gap-4">
+                <div key={index} className="pt-3 flex items-start justify-between gap-4">
                   <div className="space-y-0.5">
                     <p className="text-xs text-text/60">
                       {act.action}: <span className="font-semibold text-text">{act.target}</span>

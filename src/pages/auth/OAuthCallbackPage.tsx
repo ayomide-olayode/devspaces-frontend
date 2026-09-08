@@ -56,7 +56,7 @@ export default function OAuthCallbackPage(): JSX.Element {
 
         const authToken = response.token || response.accessToken;
         if (authToken) {
-          setAuth(authToken, response.user);
+          setAuth(authToken, response.refreshToken ?? null, response.user);
           toast.success("Welcome to DevSpace!");
           navigate("/");
         } else {

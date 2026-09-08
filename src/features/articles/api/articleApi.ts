@@ -20,7 +20,7 @@ export interface AuthorInfo {
   avatarUrl?: string | null;
 }
 
-export interface Article extends Partial<ArticleFormData> {
+export interface Article extends Omit<Partial<ArticleFormData>, "status"> {
   id: string;
   authorId: string;
   author?: AuthorInfo | null;
@@ -48,7 +48,7 @@ export interface Article extends Partial<ArticleFormData> {
 
   commentCount?: number;
   comments?: number;
-  status?: "draft" | "published"; // | "scheduled" | "archived"
+  status?: "draft" | "published" | 0 | 1 | string | number;
   createdAt: string;
   updatedAt?: string | null;
   publishedAt?: string | null;
@@ -174,7 +174,7 @@ export async function createArticle(data: ArticleFormData): Promise<Article> {
     excerpt: data.excerpt || null,
     tags: data.tagNames || [],
     coverImageUrl: data.coverImage || null,
-    status: data.status,
+    publishImmediately: data.status === "published",
   };
   const response = await apiClient.post<Article>(ENDPOINTS.POSTS.CREATE, payload);
   return response.data;
@@ -182,8 +182,10 @@ export async function createArticle(data: ArticleFormData): Promise<Article> {
 
 /** PUT /api/posts/{id} — update an existing post */
 export async function updateArticle(id: string, data: Partial<ArticleFormData>): Promise<Article> {
+  const { status, ...rest } = data;
   const payload = {
-    ...data,
+    ...rest,
+    publishImmediately: status !== undefined ? status === "published" : undefined,
     tags: data.tagNames !== undefined ? data.tagNames : undefined,
     coverImageUrl: data.coverImage !== undefined ? data.coverImage || null : undefined,
   };

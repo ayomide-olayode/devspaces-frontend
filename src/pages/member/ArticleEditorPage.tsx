@@ -27,7 +27,12 @@ export function ArticleEditorPage(): JSX.Element {
           content: article.content,
           coverImage: article.coverImageUrl || article.coverImage || "",
           tagNames: article.tags || article.tagNames || [],
-          status: article.status || "draft",
+          status:
+            (typeof article.status === "string"
+              ? article.status.trim().toLowerCase() === "published"
+              : article.status === 1)
+              ? "published"
+              : "draft",
           readingTime: article.readingTimeMinutes ?? article.readingTime ?? 0,
         });
       } catch (err: unknown) {
