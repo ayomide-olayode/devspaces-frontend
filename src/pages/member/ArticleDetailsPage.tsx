@@ -75,7 +75,7 @@ export function ArticleDetailsPage(): JSX.Element {
       try {
         setIsLoading(true);
 
-        const data = await getArticleById(id);
+        const data = await getArticleById( id as string );
 
         if (!isSubscribed) {
           return;
@@ -99,7 +99,7 @@ export function ArticleDetailsPage(): JSX.Element {
           articleData.isBookmarked ??
             articleData.isSaved ??
             articleData.saved ??
-            false,
+            false,0
         );
 
         const authorName =
