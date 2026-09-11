@@ -155,7 +155,6 @@ export function ArticleDetailsPage(): JSX.Element {
       return;
     }
 
-    if (!currentUser) {
     if (!isAuthenticated && !currentUser) {
       navigate("/auth/sign-in");
       return;

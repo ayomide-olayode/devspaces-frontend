@@ -561,6 +561,9 @@ export function ArticleComments({
   const user = useAuthStore(
     (state) => state.user,
   );
+  const isAuthenticated = useAuthStore(
+    (state) => state.isAuthenticated,
+  );
 
   // ================================================================
   // LOAD COMMENTS
@@ -642,7 +645,7 @@ export function ArticleComments({
       return;
     }
 
-    if (!user) {
+    if (!isAuthenticated && !user) {
       toast.error(
         "You must be logged in to comment",
       );
@@ -713,7 +716,7 @@ export function ArticleComments({
   const handleReplyClick = (
     comment: DisplayComment,
   ) => {
-    if (!user) {
+    if (!isAuthenticated && !user) {
       toast.error(
         "You must be logged in to reply",
       );
@@ -753,7 +756,7 @@ export function ArticleComments({
       return;
     }
 
-    if (!user) {
+    if (!isAuthenticated && !user) {
       toast.error(
         "You must be logged in to reply",
       );
@@ -954,7 +957,7 @@ export function ArticleComments({
       {/* NEW COMMENT INPUT                                             */}
       {/* ============================================================ */}
 
-      {user ? (
+      {user || isAuthenticated ? (
         <form
           onSubmit={
             handleSubmitComment
@@ -964,15 +967,15 @@ export function ArticleComments({
           <div className="flex gap-3">
             <Avatar
               src={
-                user.avatarUrl ||
+                user?.avatarUrl ||
                 undefined
               }
               name={
-                user.userName ||
+                user?.userName ||
                 "You"
               }
               alt={
-                user.userName ||
+                user?.userName ||
                 "You"
               }
               size="sm"
