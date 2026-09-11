@@ -20,7 +20,8 @@ export interface AuthorInfo {
   avatarUrl?: string | null;
 }
 
-export interface Article extends Omit<Partial<ArticleFormData>, "status"> {
+export interface Article
+  extends Omit<Partial<ArticleFormData>, "status"> {
   id: string;
   authorId: string;
   author?: AuthorInfo | null;
@@ -48,11 +49,19 @@ export interface Article extends Omit<Partial<ArticleFormData>, "status"> {
 
   commentCount?: number;
   comments?: number;
-  status?: "draft" | "published" | 0 | 1 | string | number;
+
+  status?:
+    | "draft"
+    | "published"
+    | 0
+    | 1
+    | string
+    | number;
+
   createdAt: string;
   updatedAt?: string | null;
   publishedAt?: string | null;
-  // scheduledFor?: string | null;
+
   isEditable?: boolean;
   editDeadline?: string | null;
 }
@@ -79,7 +88,6 @@ export interface MyPostsResponse {
   data: Article[];
   pagination?: Pagination;
 }
-
 export interface Comment {
   id: string;
   postId: string;
@@ -87,6 +95,8 @@ export interface Comment {
   message: string;
   parentId: string | null;
   createdAt: string;
+  author?: AuthorInfo | null;
+
   replies: Comment[];
 }
 
@@ -106,49 +116,103 @@ export interface PostInteraction {
   updatedAt?: string;
 }
 
-/** GET /api/posts/{id}/interaction — fetch user interaction state on a post */
-export async function getPostInteraction(id: string): Promise<PostInteraction | null> {
+/** GET /api/posts/{id}/interaction */
+export async function getPostInteraction(
+  id: string,
+): Promise<PostInteraction | null> {
   try {
-    const response = await apiClient.get<PostInteraction | { data?: PostInteraction }>(
-      ENDPOINTS.POSTS.INTERACTION(id),
-    );
-    if (response.data && typeof response.data === "object") {
-      const d = response.data as Record<string, unknown>;
-      if (d.data && typeof d.data === "object") {
+    const response =
+      await apiClient.get<
+        PostInteraction | {
+          data?: PostInteraction;
+        }
+      >(
+        ENDPOINTS.POSTS.INTERACTION(id),
+      );
+
+    if (
+      response.data &&
+      typeof response.data === "object"
+    ) {
+      const d =
+        response.data as Record<
+          string,
+          unknown
+        >;
+
+      if (
+        d.data &&
+        typeof d.data === "object"
+      ) {
         return d.data as PostInteraction;
       }
+
       return response.data as PostInteraction;
     }
+
     return null;
   } catch {
     return null;
   }
 }
 
-/** GET /api/posts/feed — fetch the post feed */
+/** GET /api/posts/feed */
 export async function getArticles(): Promise<Article[]> {
-  const response = await apiClient.get<FeedResponse | Article[] | { data?: Article[] }>(
-    ENDPOINTS.POSTS.FEED,
-  );
+  const response =
+    await apiClient.get<
+      | FeedResponse
+      | Article[]
+      | {
+          data?: Article[];
+        }
+    >(
+      ENDPOINTS.POSTS.FEED,
+    );
+
   if (Array.isArray(response.data)) {
     return response.data;
   }
-  if (response.data && Array.isArray((response.data as FeedResponse).data)) {
-    return (response.data as FeedResponse).data;
+
+  if (
+    response.data &&
+    Array.isArray(
+      (response.data as FeedResponse).data,
+    )
+  ) {
+    return (
+      response.data as FeedResponse
+    ).data;
   }
+
   return [];
 }
 
-/** GET /api/posts/my-posts — fetch posts created by the current user */
+/** GET /api/posts/my-posts */
 export async function getMyPosts(): Promise<Article[]> {
-  const response = await apiClient.get<MyPostsResponse | Article[] | { data?: Article[] }>(
-    ENDPOINTS.POSTS.MY_POSTS,
-  );
+  const response =
+    await apiClient.get<
+      | MyPostsResponse
+      | Article[]
+      | {
+          data?: Article[];
+        }
+    >(
+      ENDPOINTS.POSTS.MY_POSTS,
+    );
+
   if (Array.isArray(response.data)) {
     return response.data;
   }
-  if (response.data && Array.isArray((response.data as MyPostsResponse).data)) {
-    return (response.data as MyPostsResponse).data;
+
+  if (
+    response.data &&
+    Array.isArray(
+      (response.data as MyPostsResponse).data,
+    )
+  ) {
+    return (
+      response.data as MyPostsResponse
+    ).data;
   }
 
   return [];
@@ -178,12 +242,21 @@ export async function createArticle(data: ArticleFormData): Promise<Article> {
     status: isPublished ? 1 : 0,
     publishImmediately: isPublished,
   };
-  const response = await apiClient.post<Article>(ENDPOINTS.POSTS.CREATE, payload);
+
+  const response =
+    await apiClient.post<Article>(
+      ENDPOINTS.POSTS.CREATE,
+      payload,
+    );
+
   return response.data;
 }
 
 /** PUT /api/posts/{id} — update an existing post */
-export async function updateArticle(id: string, data: Partial<ArticleFormData>): Promise<Article> {
+export async function updateArticle(
+  id: string,
+  data: Partial<ArticleFormData>,
+): Promise<Article> {
   const { status, ...rest } = data;
   const isHttpUrl =
     typeof data.coverImage === "string" &&
@@ -198,7 +271,13 @@ export async function updateArticle(id: string, data: Partial<ArticleFormData>):
     tags: data.tagNames !== undefined ? data.tagNames : undefined,
     coverImageUrl: data.coverImage !== undefined ? (isHttpUrl ? data.coverImage : null) : undefined,
   };
-  const response = await apiClient.put<Article>(ENDPOINTS.POSTS.DETAIL(id), payload);
+
+  const response =
+    await apiClient.put<Article>(
+      ENDPOINTS.POSTS.DETAIL(id),
+      payload,
+    );
+
   return response.data;
 }
 
@@ -223,18 +302,34 @@ export async function deleteArticle(id: string): Promise<void> {
 }
 
 /** POST /api/posts/{id}/like — like or unlike a post */
-export async function likeArticle(id: string): Promise<void> {
-  await apiClient.post(ENDPOINTS.POSTS.LIKE(id), {});
+export async function likeArticle(
+  id: string,
+): Promise<void> {
+  await apiClient.post(
+    ENDPOINTS.POSTS.LIKE(id),
+    {},
+  );
 }
 
 /** POST /api/posts/{id}/save — save or unsave a post */
-export async function saveArticle(id: string): Promise<void> {
-  await apiClient.post(`/api/posts/${id}/save`, {});
+export async function saveArticle(
+  id: string,
+): Promise<void> {
+  await apiClient.post(
+    `/api/posts/${id}/save`,
+    {},
+  );
 }
 
-/** GET /api/posts/{id}/comments — fetch comments for a post */
-export async function getArticleComments(id: string): Promise<Comment[]> {
-  const response = await apiClient.get<Comment[]>(`/api/posts/${id}/comments`);
+/** GET /api/posts/{id}/comments */
+export async function getArticleComments(
+  id: string,
+): Promise<Comment[]> {
+  const response =
+    await apiClient.get<Comment[]>(
+      `/api/posts/${id}/comments`,
+    );
+
   return response.data;
 }
 
