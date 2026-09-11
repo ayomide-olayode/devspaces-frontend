@@ -16,13 +16,7 @@ import {
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
 } from "react-icons/hi2";
-import {
-  SiJavascript,
-  SiTypescript,
-  SiReact,
-  SiNodedotjs,
-  SiPython,
-} from "react-icons/si";
+import { SiJavascript, SiTypescript, SiReact, SiNodedotjs, SiPython } from "react-icons/si";
 import { FaInfinity } from "react-icons/fa6";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FiLogOut, FiLogIn } from "react-icons/fi";
@@ -56,7 +50,7 @@ export function SidebarSkeleton({ className }: { className?: string }): JSX.Elem
     <>
       <aside
         className={cn(
-          "hidden md:flex w-60 bg-white border-r border-border flex-col justify-between h-full max-h-screen shrink-0 p-3 overflow-y-auto overflow-x-hidden font-inter select-none",
+          "hidden md:flex w-60 bg-white border-r border-border flex-col justify-between h-full max-h-screen shrink-0 p-3 overflow-y-auto overflow-x-hidden font-inter select-none slim-scrollbar",
           className,
         )}
         aria-label="Loading Sidebar"
@@ -125,12 +119,20 @@ const MAIN_NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: <HiHome className="w-4.5 h-4.5" /> },
   { id: "my-feed", label: "My Feed", icon: <HiOutlineNewspaper className="w-4.5 h-4.5" /> },
   { id: "bookmarks", label: "Bookmarks", icon: <HiOutlineBookmark className="w-4.5 h-4.5" /> },
-  { id: "reading-list", label: "Reading List", icon: <HiOutlineBookOpen className="w-4.5 h-4.5" /> },
+  {
+    id: "reading-list",
+    label: "Reading List",
+    icon: <HiOutlineBookOpen className="w-4.5 h-4.5" />,
+  },
   { id: "history", label: "History", icon: <HiOutlineClock className="w-4.5 h-4.5" /> },
 ];
 
 const COMMUNITY_NAV_ITEMS: NavItem[] = [
-  { id: "discussions", label: "Discussions", icon: <HiOutlineChatBubbleLeftRight className="w-4.5 h-4.5" /> },
+  {
+    id: "discussions",
+    label: "Discussions",
+    icon: <HiOutlineChatBubbleLeftRight className="w-4.5 h-4.5" />,
+  },
   { id: "people", label: "People", icon: <HiOutlineUserGroup className="w-4.5 h-4.5" /> },
   { id: "leaderboard", label: "Leaderboard", icon: <HiOutlineTrophy className="w-4.5 h-4.5" /> },
   { id: "explore", label: "Explore", icon: <HiOutlineGlobeAlt className="w-4.5 h-4.5" /> },
@@ -195,6 +197,15 @@ export function Sidebar({
   const logout = useAuthStore((state) => state.logout);
   const [internalActiveItem, setInternalActiveItem] = useState("home");
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const [prevDefaultCollapsed, setPrevDefaultCollapsed] = useState(defaultCollapsed);
+  if (prevDefaultCollapsed !== defaultCollapsed) {
+    setPrevDefaultCollapsed(defaultCollapsed);
+    setIsCollapsed(defaultCollapsed);
+  }
+
+  const isExpanded = !isCollapsed || isHovered;
 
   const routeActiveItem =
     location.pathname === "/"
@@ -217,9 +228,22 @@ export function Sidebar({
     navigate("/auth/sign-in");
   };
 
-  const handleItemClick = (id: string) => {
+  const handleToggleCollapse = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation();
+    if (isCollapsed) {
+      setIsCollapsed(false);
+    } else {
+      setIsCollapsed(true);
+      setIsHovered(false);
+    }
+  };
+
+  const handleItemClick = (id: string): void => {
     setInternalActiveItem(id);
     onSelect?.(id);
+    if (isCollapsed) {
+      setIsHovered(false);
+    }
     if (!onSelect) {
       if (id === "home") navigate("/");
       else if (id === "my-feed") navigate("/articles");
@@ -232,9 +256,15 @@ export function Sidebar({
     <>
       {/* Desktop Sidebar (hidden on mobile) */}
       <aside
+        onMouseEnter={() => {
+          if (isCollapsed) setIsHovered(true);
+        }}
+        onMouseLeave={() => {
+          if (isHovered) setIsHovered(false);
+        }}
         className={cn(
-          "hidden md:flex bg-white border-r border-border flex-col justify-between h-full max-h-screen shrink-0 overflow-y-auto overflow-x-hidden font-inter select-none transition-all duration-200 ease-in-out",
-          isCollapsed ? "w-16 p-2 items-center" : "w-60 p-3",
+          "hidden md:flex bg-white border-r border-border flex-col justify-between h-full max-h-screen shrink-0 overflow-y-auto overflow-x-hidden font-inter select-none transition-all duration-300 ease-in-out slim-scrollbar",
+          isExpanded ? "w-60 p-3" : "w-16 p-2 items-center",
           className,
         )}
       >
@@ -242,26 +272,38 @@ export function Sidebar({
           {/* Header with Collapse / Expand Toggle Button */}
           <div
             className={cn(
-              "flex items-center pb-2 mb-1 border-b border-border/60",
-              isCollapsed ? "justify-center w-full" : "justify-between px-1",
+              "flex items-center pb-2 mb-1 border-b border-border/60 transition-colors",
+              isExpanded ? "justify-between px-1" : "justify-center w-full",
             )}
           >
-            {!isCollapsed && (
-              <span className="text-[11px] font-extrabold text-text/40 uppercase tracking-wider">
+            {isExpanded && (
+              <span className="text-[11px] font-extrabold text-text/40 uppercase tracking-wider truncate">
                 Menu
               </span>
             )}
             <button
               type="button"
-              onClick={() => setIsCollapsed((prev) => !prev)}
-              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="p-1.5 rounded-lg text-text/60 hover:text-text hover:bg-border/50 transition-colors cursor-pointer"
+              onClick={handleToggleCollapse}
+              aria-label={
+                !isCollapsed
+                  ? "Collapse sidebar"
+                  : isHovered
+                    ? "Pin sidebar open"
+                    : "Expand sidebar"
+              }
+              title={
+                !isCollapsed
+                  ? "Collapse sidebar"
+                  : isHovered
+                    ? "Pin sidebar open"
+                    : "Expand sidebar"
+              }
+              className="p-1.5 rounded-lg text-text/60 hover:text-text hover:bg-border/50 transition-colors cursor-pointer shrink-0"
             >
-              {isCollapsed ? (
-                <HiOutlineChevronRight className="w-4 h-4" />
-              ) : (
+              {!isCollapsed ? (
                 <HiOutlineChevronLeft className="w-4 h-4" />
+              ) : (
+                <HiOutlineChevronRight className="w-4 h-4" />
               )}
             </button>
           </div>
@@ -274,20 +316,20 @@ export function Sidebar({
                 <button
                   key={item.id}
                   type="button"
-                  title={isCollapsed ? item.label : undefined}
+                  title={!isExpanded ? item.label : undefined}
                   onClick={() => handleItemClick(item.id)}
                   className={cn(
                     "flex items-center rounded-lg text-[13px] transition-colors duration-150 cursor-pointer",
-                    isCollapsed ? "justify-center p-2.5 w-full" : "w-full gap-2.5 px-3 py-1.5",
+                    isExpanded ? "w-full gap-2.5 px-3 py-1.5" : "justify-center p-2.5 w-full",
                     isActive
                       ? "bg-primary/10 text-primary font-semibold"
                       : "text-text/70 hover:bg-border/40 hover:text-text font-medium",
                   )}
                 >
-                  <span className={isActive ? "text-primary" : "text-text/50"}>
+                  <span className={cn("shrink-0", isActive ? "text-primary" : "text-text/50")}>
                     {item.icon}
                   </span>
-                  {!isCollapsed && <span>{item.label}</span>}
+                  {isExpanded && <span className="truncate whitespace-nowrap">{item.label}</span>}
                 </button>
               );
             })}
@@ -298,8 +340,8 @@ export function Sidebar({
 
           {/* Community Section */}
           <div className="space-y-0.5 w-full">
-            {!isCollapsed && (
-              <span className="px-3 text-[10px] font-bold tracking-wider text-text/40 uppercase block mb-1">
+            {isExpanded && (
+              <span className="px-3 text-[10px] font-bold tracking-wider text-text/40 uppercase block mb-1 truncate whitespace-nowrap">
                 Community
               </span>
             )}
@@ -310,20 +352,20 @@ export function Sidebar({
                   <button
                     key={item.id}
                     type="button"
-                    title={isCollapsed ? item.label : undefined}
+                    title={!isExpanded ? item.label : undefined}
                     onClick={() => handleItemClick(item.id)}
                     className={cn(
                       "flex items-center rounded-lg text-[13px] transition-colors duration-150 cursor-pointer",
-                      isCollapsed ? "justify-center p-2.5 w-full" : "w-full gap-2.5 px-3 py-1.5",
+                      isExpanded ? "w-full gap-2.5 px-3 py-1.5" : "justify-center p-2.5 w-full",
                       isActive
                         ? "bg-primary/10 text-primary font-semibold"
                         : "text-text/70 hover:bg-border/40 hover:text-text font-medium",
                     )}
                   >
-                    <span className={isActive ? "text-primary" : "text-text/50"}>
+                    <span className={cn("shrink-0", isActive ? "text-primary" : "text-text/50")}>
                       {item.icon}
                     </span>
-                    {!isCollapsed && <span>{item.label}</span>}
+                    {isExpanded && <span className="truncate whitespace-nowrap">{item.label}</span>}
                   </button>
                 );
               })}
@@ -336,8 +378,8 @@ export function Sidebar({
           {/* Topics Section */}
           <div className="space-y-0.5 flex-1 flex flex-col justify-between w-full">
             <div>
-              {!isCollapsed && (
-                <span className="px-3 text-[10px] font-bold tracking-wider text-text/40 uppercase block mb-1">
+              {isExpanded && (
+                <span className="px-3 text-[10px] font-bold tracking-wider text-text/40 uppercase block mb-1 truncate whitespace-nowrap">
                   Topics
                 </span>
               )}
@@ -348,11 +390,11 @@ export function Sidebar({
                     <button
                       key={topic.id}
                       type="button"
-                      title={isCollapsed ? topic.label : undefined}
+                      title={!isExpanded ? topic.label : undefined}
                       onClick={() => handleItemClick(topic.id)}
                       className={cn(
                         "flex items-center rounded-lg text-[13px] transition-colors duration-150 cursor-pointer",
-                        isCollapsed ? "justify-center p-2.5 w-full" : "w-full gap-2.5 px-3 py-1",
+                        isExpanded ? "w-full gap-2.5 px-3 py-1" : "justify-center p-2.5 w-full",
                         isActive
                           ? "bg-primary/10 text-primary font-semibold"
                           : "text-text/70 hover:bg-border/40 hover:text-text font-medium",
@@ -361,48 +403,57 @@ export function Sidebar({
                       <span className="flex items-center justify-center w-4 h-4 shrink-0">
                         {topic.icon}
                       </span>
-                      {!isCollapsed && <span>{topic.label}</span>}
+                      {isExpanded && (
+                        <span className="truncate whitespace-nowrap">{topic.label}</span>
+                      )}
                     </button>
                   );
                 })}
               </nav>
             </div>
 
-            {!isCollapsed && (
+            {isExpanded && (
               <button
                 type="button"
                 onClick={() => handleItemClick("view-all-topics")}
-                className="w-full flex items-center gap-2.5 px-3 py-1 rounded-lg text-[13px] text-text/60 hover:bg-border/40 hover:text-text font-medium transition-colors duration-150 cursor-pointer mt-0.5"
+                className="w-full flex items-center gap-2.5 px-3 py-1 rounded-lg text-[13px] text-text/60 hover:bg-border/40 hover:text-text font-medium transition-colors duration-150 cursor-pointer mt-0.5 whitespace-nowrap"
               >
-                <HiOutlineChevronDown className="w-3.5 h-3.5 text-text/40" />
-                <span>View all topics</span>
+                <HiOutlineChevronDown className="w-3.5 h-3.5 text-text/40 shrink-0" />
+                <span className="truncate">View all topics</span>
               </button>
             )}
           </div>
 
           {/* Sidebar Auth Footer Action */}
-          <div className="p-3  border-t border-border mt-2 w-full">
+          <div
+            className={cn(
+              "border-t border-border mt-2 w-full transition-all duration-300",
+              isExpanded ? "p-3" : "p-1 py-2",
+            )}
+          >
             {isAuthenticated ? (
               <Button
                 variant="danger"
                 size="sm"
                 fullWidth
-                leftIcon={<FiLogOut className="w-4 h-4" />}
+                leftIcon={<FiLogOut className="w-4 h-4 shrink-0" />}
                 onClick={handleLogout}
-                title={isCollapsed ? "Logout" : undefined}
+                title={!isExpanded ? "Logout" : undefined}
+                className={!isExpanded ? "px-0 justify-center" : ""}
               >
-                {!isCollapsed && "Logout"}
+                {isExpanded && <span className="whitespace-nowrap truncate">Logout</span>}
               </Button>
             ) : (
               <Button
                 variant="primary"
                 size="sm"
                 fullWidth
-                leftIcon={<FiLogIn className="w-4 h-4" />}
+                leftIcon={<FiLogIn className="w-4 h-4 shrink-0" />}
                 onClick={() => navigate("/auth/sign-in")}
-                title={isCollapsed ? "Login" : undefined}
+                title={!isExpanded ? "Login" : undefined}
+                className={!isExpanded ? "px-0 justify-center" : ""}
               >
-                {!isCollapsed && "Login"}
+                {isExpanded && <span className="whitespace-nowrap truncate">Login</span>}
               </Button>
             )}
           </div>

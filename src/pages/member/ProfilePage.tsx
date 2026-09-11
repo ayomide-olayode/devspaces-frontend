@@ -43,6 +43,7 @@ const PROFILE_TABS: TabItem[] = [
 export default function ProfilePage(): JSX.Element {
   const { id } = useParams<{ id?: string }>();
   const currentUser = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -52,7 +53,13 @@ export default function ProfilePage(): JSX.Element {
   const [followersOffset, setFollowersOffset] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const isOwnProfile = !id || id === currentUser?.id;
+  const isOwnProfile = Boolean(
+    !id ||
+      id === "me" ||
+      (currentUser?.id && id === currentUser.id) ||
+      (currentUser?.userName && id === currentUser.userName) ||
+      (currentUser?.username && id === currentUser.username),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -169,8 +176,13 @@ export default function ProfilePage(): JSX.Element {
     const targetId = id || (profile?.id as string | undefined);
     if (!targetId || isFollowLoading) return;
 
-    if (!currentUser) {
+    if (!isAuthenticated && !currentUser) {
       toast.error("Please sign in to follow authors");
+      return;
+    }
+
+    if (currentUser?.id && targetId === currentUser.id) {
+      toast.info("You cannot follow yourself");
       return;
     }
 
@@ -419,8 +431,8 @@ export default function ProfilePage(): JSX.Element {
               </div>
 
               {/* Right: 2x2 Stats Grid */}
-              <div className="lg:pl-8 lg:border-l lg:border-border/60 shrink-0 w-full sm:w-auto">
-                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border rounded-2xl bg-white/80 overflow-hidden text-center min-w-60 sm:min-w-67.5">
+              <div className="lg:pl-8 lg:border-border/60 shrink-0 w-full sm:w-auto">
+                <div className="grid grid-cols-2 divide-x divide-y shadow-2xl divide-border/60  rounded-2xl bg-white/80 overflow-hidden text-center min-w-60 sm:min-w-67.5">
                   {/* Followers */}
                   <div className="p-3.5 sm:p-4 flex flex-col items-center justify-center gap-1">
                     <FiUsers className="w-4.5 h-4.5 text-text/40" />

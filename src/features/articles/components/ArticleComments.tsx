@@ -31,6 +31,7 @@ export function ArticleComments({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // Load comments
   useEffect(() => {
@@ -67,7 +68,7 @@ export function ArticleComments({
       return;
     }
 
-    if (!user) {
+    if (!isAuthenticated && !user) {
       toast.error("You must be logged in to comment");
       return;
     }

@@ -21,7 +21,7 @@ export const ENDPOINTS = {
   },
   AUTHORS: {
     DETAIL: (id: string) => `${API_BASE_URL}/api/authors/${id}`,
-    FOLLOW: (id:string) => `${API_BASE_URL}/api/authors/${id}/follow`
+    FOLLOW: (id: string) => `${API_BASE_URL}/api/authors/${id}/follow`,
   },
 
   POSTS: {
@@ -37,6 +37,7 @@ export const ENDPOINTS = {
     CREATE_COMMENT: (id: string) => `${API_BASE_URL}/api/posts/${id}/comment`,
 
     SAVE: (id: string) => `${API_BASE_URL}/api/posts/${id}/save`,
+    COVER_IMAGE: (id: string) => `${API_BASE_URL}/api/posts/${id}/cover-image`,
   },
   TAGS: {
     LIST: `${API_BASE_URL}/api/tags`,

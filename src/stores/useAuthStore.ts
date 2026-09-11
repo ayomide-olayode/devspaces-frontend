@@ -36,6 +36,7 @@ interface AuthState {
     refreshTokenOrUser?: string | AuthUser | null,
     maybeUser?: AuthUser,
   ) => void;
+  setUser: (user: AuthUser | null) => void;
   setTokens: (token: string, refreshToken?: string | null) => void;
   logout: () => void;
 }
@@ -89,6 +90,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       user,
       isAuthenticated: true,
     });
+  },
+
+  setUser: (user) => {
+    if (user) {
+      localStorage.setItem("devspace_user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("devspace_user");
+    }
+    syncStoredProfile(user);
+    set({ user });
   },
 
   setTokens: (token, refreshToken) => {

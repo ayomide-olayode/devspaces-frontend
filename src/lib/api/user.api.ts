@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import { ENDPOINTS } from "./endpoints";
 import { useAuthStore } from "@/stores/useAuthStore";
+import type { AuthUser } from "@/types/auth.types";
 
 export interface UserProfile {
   id?: string;
@@ -83,6 +84,22 @@ export async function getUserProfile(id?: string): Promise<UserProfile> {
     }
 
     if (Object.keys(profileData).length > 0) {
+      const resolvedUser: AuthUser = {
+        id: (profileData.id as string) || (profileData.userId as string) || currentAuthUser?.id,
+        email: (profileData.email as string) || currentAuthUser?.email,
+        username: (profileData.username as string) || (profileData.userName as string) || currentAuthUser?.username,
+        userName: (profileData.userName as string) || (profileData.username as string) || currentAuthUser?.userName,
+        firstName: (profileData.firstName as string) || currentAuthUser?.firstName,
+        lastName: (profileData.lastName as string) || currentAuthUser?.lastName,
+        avatarUrl:
+          (profileData.avatarUrl as string) ||
+          (profileData.avatar as string) ||
+          (profileData.profilePictureUrl as string) ||
+          currentAuthUser?.avatarUrl ||
+          null,
+        role: (profileData.role as string) || currentAuthUser?.role,
+      };
+      useAuthStore.getState().setUser(resolvedUser);
       return profileData;
     }
   }

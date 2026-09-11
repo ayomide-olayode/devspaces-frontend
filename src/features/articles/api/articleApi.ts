@@ -154,27 +154,29 @@ export async function getMyPosts(): Promise<Article[]> {
   return [];
 }
 
-export async function getArticleById(
-  id: string,
-): Promise<Article> {
-  const response =
-    await apiClient.get<Article>(
-      ENDPOINTS.POSTS.DETAIL(id),
-    );
+export async function getArticleById(id: string): Promise<Article> {
+  const response = await apiClient.get<Article>(ENDPOINTS.POSTS.DETAIL(id));
 
   return response.data;
 }
 
 /** POST /api/posts — create a new post */
 export async function createArticle(data: ArticleFormData): Promise<Article> {
+  const isHttpUrl =
+    typeof data.coverImage === "string" &&
+    (data.coverImage.startsWith("http://") || data.coverImage.startsWith("https://"));
+
+  const isPublished = data.status === "published";
+
   const payload = {
     title: data.title,
     content: data.content,
     slug: data.slug || undefined,
     excerpt: data.excerpt || null,
     tags: data.tagNames || [],
-    coverImageUrl: data.coverImage || null,
-    publishImmediately: data.status === "published",
+    coverImageUrl: isHttpUrl ? data.coverImage : null,
+    status: isPublished ? 1 : 0,
+    publishImmediately: isPublished,
   };
   const response = await apiClient.post<Article>(ENDPOINTS.POSTS.CREATE, payload);
   return response.data;
@@ -183,22 +185,41 @@ export async function createArticle(data: ArticleFormData): Promise<Article> {
 /** PUT /api/posts/{id} — update an existing post */
 export async function updateArticle(id: string, data: Partial<ArticleFormData>): Promise<Article> {
   const { status, ...rest } = data;
+  const isHttpUrl =
+    typeof data.coverImage === "string" &&
+    (data.coverImage.startsWith("http://") || data.coverImage.startsWith("https://"));
+
+  const isPublished = status === "published";
+
   const payload = {
     ...rest,
-    publishImmediately: status !== undefined ? status === "published" : undefined,
+    status: status !== undefined ? (isPublished ? 1 : 0) : undefined,
+    publishImmediately: status !== undefined ? isPublished : undefined,
     tags: data.tagNames !== undefined ? data.tagNames : undefined,
-    coverImageUrl: data.coverImage !== undefined ? data.coverImage || null : undefined,
+    coverImageUrl: data.coverImage !== undefined ? (isHttpUrl ? data.coverImage : null) : undefined,
   };
   const response = await apiClient.put<Article>(ENDPOINTS.POSTS.DETAIL(id), payload);
   return response.data;
 }
 
-export async function deleteArticle(
+/** POST /api/posts/{id}/cover-image — upload cover image file for a post */
+export async function uploadArticleCoverImage(
   id: string,
-): Promise<void> {
-  await apiClient.delete(
-    ENDPOINTS.POSTS.DETAIL(id),
-  );
+  file: File,
+): Promise<{ coverImageUrl?: string; message?: string } | Article> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiClient.post(ENDPOINTS.POSTS.COVER_IMAGE(id), formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+}
+
+export async function deleteArticle(id: string): Promise<void> {
+  await apiClient.delete(ENDPOINTS.POSTS.DETAIL(id));
 }
 
 /** POST /api/posts/{id}/like — like or unlike a post */
@@ -217,20 +238,15 @@ export async function getArticleComments(id: string): Promise<Comment[]> {
   return response.data;
 }
 
-
 export async function createComment(
   id: string,
   message: string,
   parentId?: string,
 ): Promise<Comment> {
-  const response =
-    await apiClient.post<Comment>(
-      ENDPOINTS.POSTS.CREATE_COMMENT(id),
-      {
-        message,
-        parentId: parentId ?? null,
-      },
-    );
+  const response = await apiClient.post<Comment>(ENDPOINTS.POSTS.CREATE_COMMENT(id), {
+    message,
+    parentId: parentId ?? null,
+  });
 
   return response.data;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { handleOAuthCallback } from "@/features/auth/api/auth.api";
+import { getUserProfile } from "@/lib/api/user.api";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "@/hooks/useToast";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -39,6 +40,11 @@ export default function OAuthCallbackPage(): JSX.Element {
       const directToken = searchParams.get("token") || searchParams.get("accessToken");
       if (directToken) {
         setAuth(directToken);
+        try {
+          await getUserProfile();
+        } catch {
+          // Gracefully continue even if profile fetch fails
+        }
         toast.success("Successfully authenticated!");
         navigate("/");
         return;
@@ -57,6 +63,13 @@ export default function OAuthCallbackPage(): JSX.Element {
         const authToken = response.token || response.accessToken;
         if (authToken) {
           setAuth(authToken, response.refreshToken ?? null, response.user);
+          if (!response.user) {
+            try {
+              await getUserProfile();
+            } catch {
+              // Gracefully continue even if profile fetch fails
+            }
+          }
           toast.success("Welcome to DevSpace!");
           navigate("/");
         } else {

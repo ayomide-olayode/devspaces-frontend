@@ -37,6 +37,7 @@ export function ArticleDetailsPage(): JSX.Element {
   const navigate = useNavigate();
 
   const currentUser = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [article, setArticle] = useState<DisplayArticle | null>(null);
 
@@ -135,7 +136,7 @@ export function ArticleDetailsPage(): JSX.Element {
     if (isLiking || !article) {
       return;
     }
-    if (!currentUser) {
+    if (!isAuthenticated && !currentUser) {
       navigate("/auth/sign-in");
       return;
     }
@@ -171,8 +172,8 @@ export function ArticleDetailsPage(): JSX.Element {
       return;
     }
 
-    if (!currentUser) {
-      navigate("/login");
+    if (!isAuthenticated && !currentUser) {
+      navigate("/auth/sign-in");
       return;
     }
 
@@ -199,9 +200,14 @@ export function ArticleDetailsPage(): JSX.Element {
       return;
     }
 
-    if (!currentUser) {
+    if (!isAuthenticated && !currentUser) {
       toast.error("Please sign in to follow authors");
       navigate("/auth/sign-in");
+      return;
+    }
+
+    if (currentUser?.id && article.authorId === currentUser.id) {
+      toast.info("You cannot follow yourself");
       return;
     }
 

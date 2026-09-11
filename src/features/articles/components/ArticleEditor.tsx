@@ -37,8 +37,8 @@ import { articleSchema, type ArticleFormData } from "../schemas/articleSchema";
 export interface ArticleEditorProps {
   initialData?: Partial<ArticleFormData>;
   isEditing?: boolean;
-  onSaveDraft?: (data: ArticleFormData) => Promise<void>;
-  onPublish?: (data: ArticleFormData) => Promise<void>;
+  onSaveDraft?: (data: ArticleFormData, coverImageFile?: File | null) => Promise<void>;
+  onPublish?: (data: ArticleFormData, coverImageFile?: File | null) => Promise<void>;
 }
 
 export function ArticleEditor({
@@ -48,14 +48,32 @@ export function ArticleEditor({
   onPublish,
 }: ArticleEditorProps): JSX.Element {
   const [tagInput, setTagInput] = useState("");
-  const [showUploadInput, setShowUploadInput] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [headingMenuOpen, setHeadingMenuOpen] = useState(false);
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [coverImagePreview, setCoverImagePreview] = useState<string>(initialData?.coverImage ?? "");
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (coverImagePreview && coverImagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(coverImagePreview);
+      }
+    };
+  }, [coverImagePreview]);
+
+  const [prevInitialCover, setPrevInitialCover] = useState(initialData?.coverImage);
+  if (initialData?.coverImage !== prevInitialCover) {
+    setPrevInitialCover(initialData?.coverImage);
+    if (!coverImageFile) {
+      setCoverImagePreview(initialData?.coverImage ?? "");
+    }
+  }
 
   const {
     register,
@@ -171,13 +189,50 @@ export function ArticleEditor({
     );
   };
 
-  const handleSaveDraftHandler = async (data: ArticleFormData) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file (PNG, JPG, WEBP, etc.)");
+      return;
+    }
+
+    const maxMb = 10;
+    if (file.size > maxMb * 1024 * 1024) {
+      toast.error(`Image size must be less than ${maxMb}MB`);
+      return;
+    }
+
+    if (coverImagePreview && coverImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(coverImagePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setCoverImageFile(file);
+    setCoverImagePreview(previewUrl);
+    setValue("coverImage", file.name, { shouldValidate: true });
+    e.target.value = "";
+  };
+
+  const handleRemoveCoverImage = (): void => {
+    if (coverImagePreview && coverImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(coverImagePreview);
+    }
+    setCoverImageFile(null);
+    setCoverImagePreview("");
+    setValue("coverImage", "", { shouldValidate: true });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleSaveDraftHandler = async (data: ArticleFormData): Promise<void> => {
     setIsSaving(true);
     try {
       if (onSaveDraft) {
-        await onSaveDraft({ ...data, status: "draft" });
+        await onSaveDraft({ ...data, status: "draft" }, coverImageFile);
       }
-      toast.success("Draft saved successfully!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to save draft");
     } finally {
@@ -185,7 +240,7 @@ export function ArticleEditor({
     }
   };
 
-  const handlePublishHandler = async (data: ArticleFormData) => {
+  const handlePublishHandler = async (data: ArticleFormData): Promise<void> => {
     if (data.status === "draft") {
       await handleSaveDraftHandler(data);
       return;
@@ -193,9 +248,8 @@ export function ArticleEditor({
     setIsPublishing(true);
     try {
       if (onPublish) {
-        await onPublish(data);
+        await onPublish(data, coverImageFile);
       }
-      toast.success("Article published successfully!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to publish article");
     } finally {
@@ -303,42 +357,63 @@ export function ArticleEditor({
                   </div>
                 </div>
 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowUploadInput((prev) => !prev)}
+                  onClick={() => fileInputRef.current?.click()}
                   className="text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                 >
-                  Upload Image
+                  {coverImagePreview ? "Change Image" : "Upload Image"}
                 </Button>
               </div>
 
-              {(showUploadInput || coverImageValue) && (
-                <div className="space-y-2 pt-1 border-t border-border/50">
-                  <input
-                    type="url"
-                    placeholder="Paste image URL (e.g. https://images.unsplash.com/...)"
-                    {...register("coverImage")}
-                    className="w-full text-xs p-2.5 rounded-lg border border-border bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary/40 text-text"
-                  />
-                  {coverImageValue && (
-                    <div className="relative rounded-lg overflow-hidden border border-border aspect-video bg-slate-100 group">
-                      <img
-                        src={coverImageValue}
-                        alt="Cover preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
+              {coverImagePreview && (
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="relative rounded-xl overflow-hidden border border-border aspect-video bg-slate-100 group shadow-2xs">
+                    <img
+                      src={coverImagePreview}
+                      alt="Cover preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-white/95 hover:bg-white text-text text-xs shadow-sm"
+                      >
+                        Change
+                      </Button>
                       <button
                         type="button"
-                        onClick={() => setValue("coverImage", "", { shouldValidate: true })}
-                        className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors"
+                        onClick={handleRemoveCoverImage}
+                        aria-label="Remove cover image"
+                        title="Remove cover image"
+                        className="p-2 rounded-lg bg-red-600/90 text-white hover:bg-red-600 transition-colors cursor-pointer shadow-sm"
                       >
                         <HiOutlineXMark className="w-4 h-4" />
                       </button>
+                    </div>
+                  </div>
+                  {coverImageFile && (
+                    <div className="flex items-center justify-between text-[11px] text-text/50 px-1">
+                      <span className="truncate max-w-[240px] font-medium text-text/70">
+                        {coverImageFile.name}
+                      </span>
+                      <span>{(coverImageFile.size / (1024 * 1024)).toFixed(2)} MB</span>
                     </div>
                   )}
                 </div>
@@ -746,7 +821,7 @@ export function ArticleEditor({
               {/* Formatted Content Body */}
               <div
                 className="prose prose-slate  w-full
-                max-w-none
+                max-w-none overflow-y-auto max-h-175
                 wrap-break-word text-xs sm:text-sm text-text/80 space-y-3"
               >
                 {contentValue.trim() ? (
@@ -754,7 +829,7 @@ export function ArticleEditor({
                     remarkPlugins={[remarkGfm]}
                     components={{
                       blockquote: ({ children }) => (
-                        <blockquote className="border-l-3 border-indigo-500 bg-indigo-50/40 px-3 py-2 italic text-indigo-950 my-2 rounded-r">
+                        <blockquote className="border-l-3 border-indigo-500 bg-indigo-50/40 px-3 py-2 italic text-indigo-950 my-2 overflow rounded-r">
                           {children}
                         </blockquote>
                       ),
